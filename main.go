@@ -196,8 +196,10 @@ OuterLoop:
 		case <-cycleTicker.C:
 			cycleTicker.Reset(5 * time.Second)
 		}
-		for host, ports := range opts.Targets {
 
+		logger.Debug("Scanning targets", zap.Any("targets", opts.Targets))
+		for host, ports := range opts.Targets {
+			logger := logger.With(zap.String("host", host))
 			<-scanTicker.C // Add a small delay to avoid hammering the server
 
 			for _, port := range ports {
@@ -206,6 +208,8 @@ OuterLoop:
 					break OuterLoop
 				default:
 				}
+
+				logger := logger.With(zap.Int("port", port))
 				baseURL := fmt.Sprintf("http://%s:%d", host, port)
 
 				if s, ok := sessions[baseURL]; ok {
@@ -225,9 +229,11 @@ OuterLoop:
 					continue
 				}
 
-				logger.Debug("Retrieved session metadata", zap.String("base_url", baseURL), zap.Any("meta", meta))
+				logger.Debug("Retrieved session metadata", zap.Any("meta", meta))
 
 				filename := recorder.EchoReplaySessionFilename(time.Now(), meta.SessionUUID)
+
+				logger = logger.With(zap.String("session_uuid", meta.SessionUUID), zap.String("filename", filename))
 				outputPath := filepath.Join(opts.OutputDirectory, filename)
 				session := recorder.NewFrameDataLogSession(ctx, logger, outputPath, meta.SessionUUID)
 				sessions[baseURL] = session
@@ -237,7 +243,7 @@ OuterLoop:
 
 				// Create a new context for the poller
 
-				logger.Info("Added new frame client", zap.String("url", baseURL), zap.String("file_path", outputPath))
+				logger.Info("Added new frame client", zap.String("file_path", outputPath))
 			}
 		}
 
