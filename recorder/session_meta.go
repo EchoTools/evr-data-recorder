@@ -1,11 +1,18 @@
 package recorder
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"os"
+	"strings"
 	"time"
+)
+
+var (
+	ErrAPIAccessDisabled = errors.New("API access is disabled on the server")
 )
 
 type SessionMeta struct {
@@ -28,6 +35,19 @@ func GetSessionMeta(baseURL string) (r SessionMeta, err error) {
 	}
 	resp, err := client.Get(EndpointSession(baseURL))
 	if err != nil {
+		// Ignore connection refused errors
+		var netErr *net.OpError
+		if ok := errors.As(err, &netErr); ok && netErr.Err != nil {
+			if sysErr, ok := netErr.Err.(*os.SyscallError); ok && sysErr.Err.Error() == "connection refused" {
+				return r, nil
+			}
+		}
+		// Also handle error string for cross-platform compatibility
+		if err.Error() != "" && ( // fallback string check
+		strings.Contains(err.Error(), "connection refused") ||
+			strings.Contains(err.Error(), "connectex: No connection could be made because the target machine actively refused it")) {
+			return r, nil
+		}
 		return r, err
 	}
 	defer resp.Body.Close()
@@ -37,6 +57,9 @@ func GetSessionMeta(baseURL string) (r SessionMeta, err error) {
 	case http.StatusNotFound:
 		// There is no active session, return empty SessionMeta
 		return r, nil
+	case http.StatusInternalServerError:
+		// API access is disabled, return empty SessionMeta
+		return r, ErrAPIAccessDisabled
 	default:
 		// Unexpected status code, return an error
 		return r, fmt.Errorf("received non-OK response: %d", resp.StatusCode)

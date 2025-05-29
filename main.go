@@ -222,7 +222,12 @@ OuterLoop:
 				}
 				meta, err := recorder.GetSessionMeta(baseURL)
 				if err != nil {
-					logger.Warn("Failed to get session metadata", zap.String("base_url", baseURL), zap.Error(err))
+					switch err {
+					case recorder.ErrAPIAccessDisabled:
+						logger.Warn("API access is disabled on the server")
+					default:
+						logger.Warn("Failed to get session metadata", zap.Error(err))
+					}
 					continue
 				}
 				if meta.SessionUUID == "" {
