@@ -212,13 +212,13 @@ OuterLoop:
 				logger := logger.With(zap.Int("port", port))
 				baseURL := fmt.Sprintf("http://%s:%d", host, port)
 
-				if s, ok := sessions[baseURL]; ok {
-					if s.IsStopped() {
-						logger.Debug("Session already stopped, removing", zap.String("url", baseURL))
+				if s, found := sessions[baseURL]; found {
+					if !s.IsStopped() {
+						logger.Debug("session still active, skipping")
+						continue
+					} else {
 						delete(sessions, baseURL)
 					}
-					logger.Debug("session still active, skipping", zap.String("url", baseURL))
-					continue
 				}
 				meta, err := recorder.GetSessionMeta(baseURL)
 				if err != nil {
