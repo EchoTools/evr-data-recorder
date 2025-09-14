@@ -81,4 +81,3 @@ jobs:
           chmod +x tools/update_benchmarks.sh
           ./tools/update_benchmarks.sh
 
-  
