@@ -37,12 +37,12 @@ jobs:
           esac
 
       - name: List built files
-        run: ls -la bin || true
+        run: ls -la . || true
 
       - name: Upload binary to release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            bin/**
+            *
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
