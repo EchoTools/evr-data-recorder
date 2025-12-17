@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/echotools/nevrcap/pkg/processing"
+	"github.com/echotools/nevrcap"
 	"go.uber.org/zap"
 )
 
@@ -33,7 +33,7 @@ func NewHTTPFramePoller(ctx context.Context, logger *zap.Logger, client *http.Cl
 		wg                sync.WaitGroup
 		sessionURL        = EndpointSession(baseURL)
 		playerBonesURL    = EndpointPlayerBones(baseURL)
-		processor         = processing.New()
+		processor         = nevrcap.NewFrameProcessor()
 		sessionBuffer     = bytes.NewBuffer(make([]byte, 0, 64*1024)) // 64KB buffer
 		playerBonesBuffer = bytes.NewBuffer(make([]byte, 0, 64*1024)) // 64KB buffer
 	)

@@ -10,8 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/echotools/nevrcap/pkg/codecs"
-	"github.com/echotools/nevrcap/pkg/conversion"
+	"github.com/echotools/nevrcap"
 )
 
 const (
@@ -214,7 +213,7 @@ func convertEchoReplayToNevrcap(inputFile, outputFile string, config *ConverterC
 	}
 
 	// Use the nevrcap converter
-	if err := conversion.ConvertEchoReplayToNevrcap(inputFile, outputFile); err != nil {
+	if err := nevrcap.ConvertEchoReplayToNevrcap(inputFile, outputFile); err != nil {
 		return nil, fmt.Errorf("conversion failed: %w", err)
 	}
 
@@ -247,7 +246,7 @@ func convertNevrcapToEchoReplay(inputFile, outputFile string, config *ConverterC
 	}
 
 	// Use the nevrcap converter
-	if err := conversion.ConvertNevrcapToEchoReplay(inputFile, outputFile); err != nil {
+	if err := nevrcap.ConvertNevrcapToEchoReplay(inputFile, outputFile); err != nil {
 		return nil, fmt.Errorf("conversion failed: %w", err)
 	}
 
@@ -294,13 +293,13 @@ func convertSameFormat(inputFile, outputFile string, config *ConverterConfig) (*
 func copyEchoReplayWithModifications(inputFile, outputFile string, config *ConverterConfig) (*ConversionStats, error) {
 	stats := &ConversionStats{}
 
-	reader, err := codecs.NewEchoReplayReader(inputFile)
+	reader, err := nevrcap.NewEchoReplayFileReader(inputFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create input reader: %w", err)
 	}
 	defer reader.Close()
 
-	writer, err := codecs.NewEchoReplayWriter(outputFile)
+	writer, err := nevrcap.NewEchoReplayCodecWriter(outputFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create output writer: %w", err)
 	}
@@ -346,13 +345,13 @@ func copyEchoReplayWithModifications(inputFile, outputFile string, config *Conve
 func copyNevrcapWithModifications(inputFile, outputFile string, config *ConverterConfig) (*ConversionStats, error) {
 	stats := &ConversionStats{}
 
-	reader, err := codecs.NewNevrCapReader(inputFile)
+	reader, err := nevrcap.NewZstdCodecReader(inputFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create input reader: %w", err)
 	}
 	defer reader.Close()
 
-	writer, err := codecs.NewNevrCapWriter(outputFile)
+	writer, err := nevrcap.NewZstdCodecWriter(outputFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create output writer: %w", err)
 	}
@@ -418,7 +417,7 @@ func excludeBoneDataFromEchoReplay(filename string, config *ConverterConfig) err
 }
 
 func countFramesInNevrcap(filename string) (int, error) {
-	reader, err := codecs.NewNevrCapReader(filename)
+	reader, err := nevrcap.NewZstdCodecReader(filename)
 	if err != nil {
 		return 0, err
 	}
@@ -443,7 +442,7 @@ func countFramesInNevrcap(filename string) (int, error) {
 }
 
 func countFramesInEchoReplay(filename string) (int, error) {
-	reader, err := codecs.NewEchoReplayReader(filename)
+	reader, err := nevrcap.NewEchoReplayFileReader(filename)
 	if err != nil {
 		return 0, err
 	}
