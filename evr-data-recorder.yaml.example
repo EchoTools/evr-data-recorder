@@ -1,0 +1,51 @@
+# EVR Data Recorder Configuration File
+# This file can be used to configure the evr-data-recorder application
+# Command-line flags will override values in this file
+# Environment variables with the EVR_ prefix will also override config values
+
+# Global configuration
+debug: false
+log_level: info
+log_file: ""
+
+# Agent configuration
+agent:
+  frequency: 10
+  format: replay
+  output_directory: ./output
+  
+  # Stream configuration (optional)
+  stream_enabled: false
+  stream_http_url: https://g.echovrce.com:7350
+  stream_socket_url: wss://g.echovrce.com:7350/ws
+  stream_http_key: ""
+  stream_server_key: ""
+  stream_username: ""
+  stream_password: ""
+  
+  # Events API configuration (optional)
+  events_enabled: false
+  events_url: http://localhost:8081
+  events_user_id: ""
+  events_node_id: default-node
+
+# API Server configuration
+apiserver:
+  server_address: ":8081"
+  mongo_uri: mongodb://localhost:27017
+
+# Converter configuration
+converter:
+  input_file: ""
+  output_file: ""
+  output_dir: ./
+  format: auto
+  verbose: false
+  overwrite: false
+  exclude_bone_data: false
+
+# Replayer configuration
+replayer:
+  bind_address: "127.0.0.1:6721"
+  loop: false
+  files: []

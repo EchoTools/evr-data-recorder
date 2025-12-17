@@ -1,0 +1,240 @@
+package config
+
+import (
+	"fmt"
+	"os"
+	"strings"
+
+	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+)
+
+// Config holds all configuration for the application
+type Config struct {
+	// Global configuration
+	Debug      bool   `yaml:"debug" mapstructure:"debug"`
+	LogLevel   string `yaml:"log_level" mapstructure:"log_level"`
+	LogFile    string `yaml:"log_file" mapstructure:"log_file"`
+	ConfigFile string `yaml:"config" mapstructure:"config"`
+
+	// Agent configuration
+	Agent AgentConfig `yaml:"agent" mapstructure:"agent"`
+
+	// API Server configuration
+	APIServer APIServerConfig `yaml:"apiserver" mapstructure:"apiserver"`
+
+	// Converter configuration
+	Converter ConverterConfig `yaml:"converter" mapstructure:"converter"`
+
+	// Replayer configuration
+	Replayer ReplayerConfig `yaml:"replayer" mapstructure:"replayer"`
+}
+
+// AgentConfig holds configuration for the agent subcommand
+type AgentConfig struct {
+	Frequency       int               `yaml:"frequency" mapstructure:"frequency"`
+	Format          string            `yaml:"format" mapstructure:"format"`
+	OutputDirectory string            `yaml:"output_directory" mapstructure:"output_directory"`
+	Targets         map[string]string `yaml:"targets" mapstructure:"targets"`
+
+	// Stream configuration
+	StreamEnabled   bool   `yaml:"stream_enabled" mapstructure:"stream_enabled"`
+	StreamHTTPURL   string `yaml:"stream_http_url" mapstructure:"stream_http_url"`
+	StreamSocketURL string `yaml:"stream_socket_url" mapstructure:"stream_socket_url"`
+	StreamHTTPKey   string `yaml:"stream_http_key" mapstructure:"stream_http_key"`
+	StreamServerKey string `yaml:"stream_server_key" mapstructure:"stream_server_key"`
+	StreamUsername  string `yaml:"stream_username" mapstructure:"stream_username"`
+	StreamPassword  string `yaml:"stream_password" mapstructure:"stream_password"`
+
+	// Events API configuration
+	EventsEnabled bool   `yaml:"events_enabled" mapstructure:"events_enabled"`
+	EventsURL     string `yaml:"events_url" mapstructure:"events_url"`
+	EventsUserID  string `yaml:"events_user_id" mapstructure:"events_user_id"`
+	EventsNodeID  string `yaml:"events_node_id" mapstructure:"events_node_id"`
+}
+
+// APIServerConfig holds configuration for the API server subcommand
+type APIServerConfig struct {
+	ServerAddress string `yaml:"server_address" mapstructure:"server_address"`
+	MongoURI      string `yaml:"mongo_uri" mapstructure:"mongo_uri"`
+}
+
+// ConverterConfig holds configuration for the converter subcommand
+type ConverterConfig struct {
+	InputFile       string `yaml:"input_file" mapstructure:"input_file"`
+	OutputFile      string `yaml:"output_file" mapstructure:"output_file"`
+	OutputDir       string `yaml:"output_dir" mapstructure:"output_dir"`
+	Format          string `yaml:"format" mapstructure:"format"`
+	Verbose         bool   `yaml:"verbose" mapstructure:"verbose"`
+	Overwrite       bool   `yaml:"overwrite" mapstructure:"overwrite"`
+	ExcludeBoneData bool   `yaml:"exclude_bone_data" mapstructure:"exclude_bone_data"`
+}
+
+// ReplayerConfig holds configuration for the replayer subcommand
+type ReplayerConfig struct {
+	BindAddress string   `yaml:"bind_address" mapstructure:"bind_address"`
+	Loop        bool     `yaml:"loop" mapstructure:"loop"`
+	Files       []string `yaml:"files" mapstructure:"files"`
+}
+
+// DefaultConfig returns a Config with default values
+func DefaultConfig() *Config {
+	return &Config{
+		Debug:    false,
+		LogLevel: "info",
+		LogFile:  "",
+		Agent: AgentConfig{
+			Frequency:       10,
+			Format:          "replay",
+			OutputDirectory: "output",
+			StreamHTTPURL:   "https://g.echovrce.com:7350",
+			StreamSocketURL: "wss://g.echovrce.com:7350/ws",
+			StreamHTTPKey:   "this_is_the_http_key",
+			StreamServerKey: "this_is_the_server_key",
+			EventsURL:       "http://localhost:8081",
+			EventsNodeID:    "default-node",
+		},
+		APIServer: APIServerConfig{
+			ServerAddress: ":8081",
+			MongoURI:      "mongodb://localhost:27017",
+		},
+		Converter: ConverterConfig{
+			OutputDir: "./",
+			Format:    "auto",
+		},
+		Replayer: ReplayerConfig{
+			BindAddress: "127.0.0.1:6721",
+			Loop:        false,
+		},
+	}
+}
+
+// LoadConfig loads configuration from file, environment variables, and CLI flags
+func LoadConfig(configFile string) (*Config, error) {
+	// Load .env file if it exists
+	_ = godotenv.Load()
+
+	config := DefaultConfig()
+
+	// Set up viper
+	v := viper.New()
+	v.SetConfigType("yaml")
+
+	// Load config file if specified
+	if configFile != "" {
+		v.SetConfigFile(configFile)
+		if err := v.ReadInConfig(); err != nil {
+			if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+				return nil, fmt.Errorf("error reading config file: %w", err)
+			}
+			// Config file not found; ignore error
+		}
+	}
+
+	// Set up environment variable support
+	v.SetEnvPrefix("EVR")
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
+	v.AutomaticEnv()
+
+	// Unmarshal config
+	if err := v.Unmarshal(config); err != nil {
+		return nil, fmt.Errorf("error unmarshaling config: %w", err)
+	}
+
+	return config, nil
+}
+
+// NewLogger creates a zap logger based on the configuration
+func (c *Config) NewLogger() (*zap.Logger, error) {
+	var level zapcore.Level
+	switch strings.ToLower(c.LogLevel) {
+	case "debug":
+		level = zapcore.DebugLevel
+	case "info":
+		level = zapcore.InfoLevel
+	case "warn":
+		level = zapcore.WarnLevel
+	case "error":
+		level = zapcore.ErrorLevel
+	default:
+		if c.Debug {
+			level = zapcore.DebugLevel
+		} else {
+			level = zapcore.InfoLevel
+		}
+	}
+
+	cfg := zap.NewProductionConfig()
+	cfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	cfg.Level.SetLevel(level)
+
+	if c.LogFile != "" {
+		// Log to file and console
+		cfg.OutputPaths = []string{c.LogFile, "stdout"}
+		cfg.ErrorOutputPaths = []string{c.LogFile, "stderr"}
+	} else {
+		cfg.OutputPaths = []string{"stdout"}
+		cfg.ErrorOutputPaths = []string{"stderr"}
+	}
+
+	logger, err := cfg.Build()
+	if err != nil {
+		return nil, fmt.Errorf("error creating logger: %w", err)
+	}
+
+	return logger, nil
+}
+
+// ValidateAgentConfig validates agent-specific configuration
+func (c *Config) ValidateAgentConfig() error {
+	if c.Agent.Frequency <= 0 {
+		return fmt.Errorf("frequency must be greater than 0")
+	}
+	if c.Agent.OutputDirectory == "" {
+		return fmt.Errorf("output directory must be specified")
+	}
+	if err := os.MkdirAll(c.Agent.OutputDirectory, 0755); err != nil {
+		return fmt.Errorf("failed to create output directory: %w", err)
+	}
+	return nil
+}
+
+// ValidateAPIServerConfig validates API server configuration
+func (c *Config) ValidateAPIServerConfig() error {
+	if c.APIServer.ServerAddress == "" {
+		return fmt.Errorf("server address must be specified")
+	}
+	if c.APIServer.MongoURI == "" {
+		return fmt.Errorf("mongo URI must be specified")
+	}
+	return nil
+}
+
+// ValidateConverterConfig validates converter configuration
+func (c *Config) ValidateConverterConfig() error {
+	if c.Converter.InputFile == "" {
+		return fmt.Errorf("input file must be specified")
+	}
+	if _, err := os.Stat(c.Converter.InputFile); os.IsNotExist(err) {
+		return fmt.Errorf("input file does not exist: %s", c.Converter.InputFile)
+	}
+	return nil
+}
+
+// ValidateReplayerConfig validates replayer configuration
+func (c *Config) ValidateReplayerConfig() error {
+	if c.Replayer.BindAddress == "" {
+		return fmt.Errorf("bind address must be specified")
+	}
+	if len(c.Replayer.Files) == 0 {
+		return fmt.Errorf("at least one replay file must be specified")
+	}
+	for _, file := range c.Replayer.Files {
+		if _, err := os.Stat(file); os.IsNotExist(err) {
+			return fmt.Errorf("replay file does not exist: %s", file)
+		}
+	}
+	return nil
+}

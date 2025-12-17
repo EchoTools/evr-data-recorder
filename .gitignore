@@ -29,6 +29,8 @@ go.work.sum
 .env
 
 # binary
+/evr-data-recorder
+/evr-data-recorder.exe
 /agent
 /replayer
 /converter

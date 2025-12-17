@@ -1,48 +1,48 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo v0.0.0)
 LDFLAGS = -X main.version=$(VERSION) -s -w
 
-# Binaries under cmd/
-CMDS := agent apiserver converter dumpevents replayer webviewer
+# Main consolidated binary
+BINARY := evr-data-recorder
+
+# Legacy binaries under cmd/ (kept for compatibility)
+LEGACY_CMDS := agent apiserver converter dumpevents replayer
 
 # OS detection
 GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
 
 # Windows-specific variables
-WINDOWS_CMDS := $(addsuffix .exe,$(CMDS))
+WINDOWS_BINARY := $(BINARY).exe
+WINDOWS_LEGACY_CMDS := $(addsuffix .exe,$(LEGACY_CMDS))
 
-.PHONY: all version cmds windows linux $(CMDS) $(WINDOWS_CMDS) bench test clean build-% build-%-windows
+.PHONY: all version build windows linux legacy clean test bench
 
-all: cmds
+all: build
 
 version:
 	@echo $(VERSION)
 
-# Build all cmd/* binaries for current OS
-cmds: $(CMDS)
+# Build the main consolidated binary
+build:
+	@echo "Building $(BINARY) for $(GOOS)/$(GOARCH) (version=$(VERSION))"
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags "$(LDFLAGS)" -o $(BINARY) ./cmd/evr-data-recorder
 
-# Build all cmd/* binaries for Windows
-windows: $(WINDOWS_CMDS)
+# Build for Windows
+windows:
+	@echo "Building $(WINDOWS_BINARY) for windows/amd64 (version=$(VERSION))"
+	GOOS=windows GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o $(WINDOWS_BINARY) ./cmd/evr-data-recorder
 
-# Build all cmd/* binaries for Linux
-linux: GOOS=linux
-linux: $(CMDS)
+# Build for Linux
+linux:
+	@echo "Building $(BINARY) for linux/amd64 (version=$(VERSION))"
+	GOOS=linux GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o $(BINARY) ./cmd/evr-data-recorder
 
-# Individual cmd/* targets (phony wrappers)
-$(CMDS): %: build-%
+# Build legacy individual commands (for backward compatibility)
+legacy: $(LEGACY_CMDS)
 
-# Individual Windows targets
-$(WINDOWS_CMDS): %.exe: build-%-windows
-
-# Pattern rule to build a cmd/* binary for current/specified OS
-build-%:
-	@echo "Building $* for $(GOOS)/$(GOARCH) (version=$(VERSION))"
+$(LEGACY_CMDS): %:
+	@echo "Building legacy $* for $(GOOS)/$(GOARCH) (version=$(VERSION))"
 	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags "$(LDFLAGS)" -o $* ./cmd/$*
-
-# Pattern rule to build a cmd/* binary for Windows
-build-%-windows:
-	@echo "Building $*.exe for windows/amd64 (version=$(VERSION))"
-	GOOS=windows GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o $*.exe ./cmd/$*
 
 bench:
 	go test -bench=. -benchmem ./...
@@ -51,4 +51,4 @@ test:
 	go test ./...
 
 clean:
-	rm -f $(CMDS) $(WINDOWS_CMDS)
+	rm -f $(BINARY) $(WINDOWS_BINARY) $(LEGACY_CMDS) $(WINDOWS_LEGACY_CMDS)
