@@ -19,7 +19,7 @@ var (
 
 func main() {
 	rootCmd := &cobra.Command{
-		Use:     "evr-data-recorder",
+		Use:     "evrtelemetry",
 		Short:   "EVR Data Recorder - Tools for recording and processing EchoVR game data",
 		Version: version,
 		Long: `EVR Data Recorder is a suite of tools for recording session and player 
@@ -58,7 +58,7 @@ and serving recorded data.`,
 	}
 
 	// Global flags
-	rootCmd.PersistentFlags().StringVarP(&configFile, "config", "c", "", "config file (default is ./evr-data-recorder.yaml)")
+	rootCmd.PersistentFlags().StringVarP(&configFile, "config", "c", "", "config file (default is ./evrtelemetry.yaml)")
 	rootCmd.PersistentFlags().BoolP("debug", "d", false, "enable debug logging")
 	rootCmd.PersistentFlags().String("log-level", "info", "log level (debug, info, warn, error)")
 	rootCmd.PersistentFlags().String("log-file", "", "log file path")

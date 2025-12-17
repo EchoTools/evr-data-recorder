@@ -21,16 +21,16 @@ func newConverterCommand() *cobra.Command {
 		Long: `The converter command converts replay files between the .echoreplay 
 (zip format) and .nevrcap (zstd compressed) formats.`,
 		Example: `  # Convert echoreplay to nevrcap
-  evr-data-recorder converter --input game.echoreplay
+  evrtelemetry converter --input game.echoreplay
 
   # Convert nevrcap to echoreplay
-  evr-data-recorder converter --input game.nevrcap
+  evrtelemetry converter --input game.nevrcap
 
   # Force specific output format
-  evr-data-recorder converter --input game.echoreplay --format nevrcap
+  evrtelemetry converter --input game.echoreplay --format nevrcap
 
   # Specify output file
-  evr-data-recorder converter --input game.nevrcap --output converted.echoreplay`,
+  evrtelemetry converter --input game.nevrcap --output converted.echoreplay`,
 		RunE: runConverter,
 	}
 

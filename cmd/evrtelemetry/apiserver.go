@@ -41,13 +41,13 @@ func newAPIServerCommand() *cobra.Command {
 		Long: `The apiserver command starts an HTTP server that provides endpoints 
 for storing and retrieving session event data.`,
 		Example: `  # Start API server on default port
-  evr-data-recorder apiserver
+  evrtelemetry apiserver
 
   # Start with custom MongoDB URI
-  evr-data-recorder apiserver --mongo-uri mongodb://localhost:27017
+  evrtelemetry apiserver --mongo-uri mongodb://localhost:27017
 
   # Use a config file
-  evr-data-recorder apiserver -c config.yaml`,
+  evrtelemetry apiserver -c config.yaml`,
 		RunE: runAPIServer,
 	}
 

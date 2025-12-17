@@ -54,16 +54,16 @@ func newReplayerCommand() *cobra.Command {
 		Long: `The replayer command starts an HTTP server that plays back recorded 
 session data from .echoreplay files.`,
 		Example: `  # Replay a single file
-  evr-data-recorder replayer game.echoreplay
+  evrtelemetry replayer game.echoreplay
 
   # Replay multiple files in sequence
-  evr-data-recorder replayer game1.echoreplay game2.echoreplay
+  evrtelemetry replayer game1.echoreplay game2.echoreplay
 
   # Replay in loop mode
-  evr-data-recorder replayer --loop game.echoreplay
+  evrtelemetry replayer --loop game.echoreplay
 
   # Custom bind address
-  evr-data-recorder replayer --bind 0.0.0.0:8080 game.echoreplay`,
+  evrtelemetry replayer --bind 0.0.0.0:8080 game.echoreplay`,
 		RunE: runReplayer,
 		Args: cobra.MinimumNArgs(1),
 	}
