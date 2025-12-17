@@ -1,48 +1,35 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo v0.0.0)
 LDFLAGS = -X main.version=$(VERSION) -s -w
 
-# Binaries under cmd/
-CMDS := agent apiserver converter dumpevents replayer webviewer
+BINARY = datarecorder
+BIN_DIR = .
 
-# OS detection
-GOOS ?= $(shell go env GOOS)
-GOARCH ?= $(shell go env GOARCH)
+.PHONY: all build build-linux build-windows test bench clean version replay-server virtex-exporter
 
-# Windows-specific variables
-WINDOWS_CMDS := $(addsuffix .exe,$(CMDS))
-
-.PHONY: all version cmds windows linux $(CMDS) $(WINDOWS_CMDS) bench test clean build-% build-%-windows
-
-all: cmds
+all: build
 
 version:
 	@echo $(VERSION)
 
-# Build all cmd/* binaries for current OS
-cmds: $(CMDS)
+build: | $(BIN_DIR)
+	@echo "Building $(BINARY) (version=$(VERSION))"
+	go build -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/$(BINARY) .
 
-# Build all cmd/* binaries for Windows
-windows: $(WINDOWS_CMDS)
+replay-server: | $(BIN_DIR)
+	@echo "Building replay-server (version=$(VERSION))"
+	go build -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/replay-server ./cmd/replayer
 
-# Build all cmd/* binaries for Linux
-linux: GOOS=linux
-linux: $(CMDS)
+virtex-exporter: | $(BIN_DIR)
+	@echo "Building virtex-exporter (version=$(VERSION))"
+	go build -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/virtex-exporter ./cmd/virtex-exporter
 
-# Individual cmd/* targets (phony wrappers)
-$(CMDS): %: build-%
+build-linux: | $(BIN_DIR)
+	@echo "Building linux/amd64 $(BINARY) (version=$(VERSION))"
+	GOOS=linux GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/$(BINARY)-linux .
 
-# Individual Windows targets
-$(WINDOWS_CMDS): %.exe: build-%-windows
-
-# Pattern rule to build a cmd/* binary for current/specified OS
-build-%:
-	@echo "Building $* for $(GOOS)/$(GOARCH) (version=$(VERSION))"
-	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags "$(LDFLAGS)" -o $* ./cmd/$*
-
-# Pattern rule to build a cmd/* binary for Windows
-build-%-windows:
-	@echo "Building $*.exe for windows/amd64 (version=$(VERSION))"
-	GOOS=windows GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o $*.exe ./cmd/$*
+build-windows: | $(BIN_DIR)
+	@echo "Building windows/amd64 $(BINARY) (version=$(VERSION))"
+	GOOS=windows GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/$(BINARY).exe .
 
 bench:
 	go test -bench=. -benchmem ./...
@@ -50,5 +37,8 @@ bench:
 test:
 	go test ./...
 
+$(BIN_DIR):
+	mkdir -p $(BIN_DIR)
+
 clean:
-	rm -f $(CMDS) $(WINDOWS_CMDS)
+	rm -rf $(BIN_DIR)
