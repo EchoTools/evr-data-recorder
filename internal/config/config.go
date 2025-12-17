@@ -62,7 +62,6 @@ type APIServerConfig struct {
 }
 
 // ConverterConfig holds configuration for the converter subcommand
-// ConverterConfig holds configuration for the converter subcommand
 type ConverterConfig struct {
 	InputFile  string `yaml:"input_file" mapstructure:"input_file"`
 	OutputFile string `yaml:"output_file" mapstructure:"output_file"`
