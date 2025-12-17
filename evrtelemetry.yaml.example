@@ -1,5 +1,5 @@
-# EVR Data Recorder Configuration File
-# This file can be used to configure the evr-data-recorder application
+# EVR Telemetry Configuration File
+# This file can be used to configure the evrtelemetry application
 # Command-line flags will override values in this file
 # Environment variables with the EVR_ prefix will also override config values
 
@@ -42,7 +42,6 @@ converter:
   format: auto
   verbose: false
   overwrite: false
-  exclude_bone_data: false
 
 # Replayer configuration
 replayer:

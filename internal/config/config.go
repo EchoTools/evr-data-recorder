@@ -62,14 +62,14 @@ type APIServerConfig struct {
 }
 
 // ConverterConfig holds configuration for the converter subcommand
+// ConverterConfig holds configuration for the converter subcommand
 type ConverterConfig struct {
-	InputFile       string `yaml:"input_file" mapstructure:"input_file"`
-	OutputFile      string `yaml:"output_file" mapstructure:"output_file"`
-	OutputDir       string `yaml:"output_dir" mapstructure:"output_dir"`
-	Format          string `yaml:"format" mapstructure:"format"`
-	Verbose         bool   `yaml:"verbose" mapstructure:"verbose"`
-	Overwrite       bool   `yaml:"overwrite" mapstructure:"overwrite"`
-	ExcludeBoneData bool   `yaml:"exclude_bone_data" mapstructure:"exclude_bone_data"`
+	InputFile  string `yaml:"input_file" mapstructure:"input_file"`
+	OutputFile string `yaml:"output_file" mapstructure:"output_file"`
+	OutputDir  string `yaml:"output_dir" mapstructure:"output_dir"`
+	Format     string `yaml:"format" mapstructure:"format"`
+	Verbose    bool   `yaml:"verbose" mapstructure:"verbose"`
+	Overwrite  bool   `yaml:"overwrite" mapstructure:"overwrite"`
 }
 
 // ReplayerConfig holds configuration for the replayer subcommand
