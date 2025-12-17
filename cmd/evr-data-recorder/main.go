@@ -6,6 +6,7 @@ import (
 
 	"github.com/echotools/evr-data-recorder/v3/internal/config"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
 
@@ -31,6 +32,17 @@ and serving recorded data.`,
 				return fmt.Errorf("failed to load config: %w", err)
 			}
 
+			// Override config with global flags
+			if viper.IsSet("debug") {
+				cfg.Debug = viper.GetBool("debug")
+			}
+			if viper.IsSet("log-level") {
+				cfg.LogLevel = viper.GetString("log-level")
+			}
+			if viper.IsSet("log-file") {
+				cfg.LogFile = viper.GetString("log-file")
+			}
+
 			logger, err = cfg.NewLogger()
 			if err != nil {
 				return fmt.Errorf("failed to create logger: %w", err)
@@ -50,6 +62,11 @@ and serving recorded data.`,
 	rootCmd.PersistentFlags().BoolP("debug", "d", false, "enable debug logging")
 	rootCmd.PersistentFlags().String("log-level", "info", "log level (debug, info, warn, error)")
 	rootCmd.PersistentFlags().String("log-file", "", "log file path")
+
+	// Bind global flags to viper
+	viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
+	viper.BindPFlag("log-level", rootCmd.PersistentFlags().Lookup("log-level"))
+	viper.BindPFlag("log-file", rootCmd.PersistentFlags().Lookup("log-file"))
 
 	// Add subcommands
 	rootCmd.AddCommand(newAgentCommand())

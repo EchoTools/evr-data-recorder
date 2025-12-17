@@ -103,12 +103,13 @@ func runReplayer(cmd *cobra.Command, args []string) error {
 	// Start playback in background
 	go server.playback()
 
-	// Setup HTTP handlers
-	http.HandleFunc("/", server.handleRoot)
-	http.HandleFunc("/frame", server.handleFrame)
-	http.HandleFunc("/session", server.handleSession)
-	http.HandleFunc("/player_bones", server.handlePlayerBones)
-	http.HandleFunc("/status", server.handleStatus)
+	// Create a dedicated ServeMux instead of using the default one
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", server.handleRoot)
+	mux.HandleFunc("/frame", server.handleFrame)
+	mux.HandleFunc("/session", server.handleSession)
+	mux.HandleFunc("/player_bones", server.handlePlayerBones)
+	mux.HandleFunc("/status", server.handleStatus)
 
 	logger.Info("Replay server started",
 		zap.String("address", cfg.Replayer.BindAddress),
@@ -121,7 +122,7 @@ func runReplayer(cmd *cobra.Command, args []string) error {
 		zap.String("GET /player_bones", "Current player bone data (JSON)"),
 		zap.String("GET /status", "Server status (JSON)"))
 
-	if err := http.ListenAndServe(cfg.Replayer.BindAddress, nil); err != nil {
+	if err := http.ListenAndServe(cfg.Replayer.BindAddress, mux); err != nil {
 		return fmt.Errorf("failed to start server: %w", err)
 	}
 

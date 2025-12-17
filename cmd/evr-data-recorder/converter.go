@@ -41,7 +41,6 @@ func newConverterCommand() *cobra.Command {
 	cmd.Flags().StringP("format", "f", "auto", "Output format: auto, echoreplay, nevrcap")
 	cmd.Flags().BoolP("verbose", "v", false, "Enable verbose logging")
 	cmd.Flags().Bool("overwrite", false, "Overwrite existing output files")
-	cmd.Flags().Bool("exclude-bone-data", false, "Exclude bone data from converted files")
 
 	cmd.MarkFlagRequired("input")
 
@@ -59,7 +58,6 @@ func runConverter(cmd *cobra.Command, args []string) error {
 	cfg.Converter.Format = viper.GetString("format")
 	cfg.Converter.Verbose = viper.GetBool("verbose")
 	cfg.Converter.Overwrite = viper.GetBool("overwrite")
-	cfg.Converter.ExcludeBoneData = viper.GetBool("exclude-bone-data")
 
 	// Validate configuration
 	if err := cfg.ValidateConverterConfig(); err != nil {

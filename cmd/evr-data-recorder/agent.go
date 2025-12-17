@@ -204,6 +204,13 @@ OuterLoop:
 
 				// Create the appropriate file writer based on format
 				formats := strings.Split(cfg.Agent.Format, ",")
+				hasStreamFormat := false
+				for _, format := range formats {
+					if strings.TrimSpace(format) == "stream" {
+						hasStreamFormat = true
+						break
+					}
+				}
 
 				if len(formats) > 1 {
 					// Create multi-writer
@@ -259,8 +266,8 @@ OuterLoop:
 
 				var session agent.FrameWriter = fileWriter
 
-				// If streaming is enabled, create stream writer and multi-writer
-				if cfg.Agent.StreamEnabled {
+				// If streaming is enabled via flag (and not already in format list), add stream writer
+				if cfg.Agent.StreamEnabled && !hasStreamFormat {
 					streamWriter := agent.NewStreamWriter(logger, cfg.Agent.StreamHTTPURL, cfg.Agent.StreamSocketURL,
 						cfg.Agent.StreamHTTPKey, cfg.Agent.StreamServerKey, cfg.Agent.StreamUsername, cfg.Agent.StreamPassword)
 					if err := streamWriter.Connect(); err != nil {
