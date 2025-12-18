@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	api "github.com/echotools/evr-data-recorder/v3/internal/api"
+	api "github.com/echotools/evr-data-recorder/v4/internal/api"
 	rtapi "github.com/echotools/nevr-common/v4/gen/go/rtapi"
 	"go.uber.org/zap"
 )

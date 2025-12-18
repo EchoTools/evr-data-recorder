@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/echotools/evr-data-recorder/v3/internal/config"
+	"github.com/echotools/evr-data-recorder/v4/internal/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"

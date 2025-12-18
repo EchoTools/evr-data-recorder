@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/echotools/evr-data-recorder/v3/internal/agent"
+	"github.com/echotools/evr-data-recorder/v4/internal/agent"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"

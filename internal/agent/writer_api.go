@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	rtapi "github.com/echotools/nevr-common/v4/gen/go/rtapi"
-	"github.com/echotools/nevrcap/pkg/processing"
+	"github.com/echotools/nevrcap/v3/pkg/processing"
 	nkrtapi "github.com/heroiclabs/nakama-common/rtapi"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"

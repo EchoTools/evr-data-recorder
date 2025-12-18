@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/echotools/nevr-common/v4/gen/go/rtapi"
-	"github.com/echotools/nevrcap/pkg/codecs"
+	rtapi "github.com/echotools/nevr-common/v4/gen/go/rtapi"
+	"github.com/echotools/nevrcap/v3/pkg/codecs"
 	"go.uber.org/zap"
 )
 

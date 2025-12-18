@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/echotools/nevrcap/pkg/processing"
+	"github.com/echotools/nevrcap/v3/pkg/processing"
 	"go.uber.org/zap"
 )
 
@@ -102,7 +102,7 @@ func NewHTTPFramePoller(ctx context.Context, logger *zap.Logger, client *http.Cl
 		default:
 		}
 
-		frame, err := processor.ProcessFrame(sessionBuffer.Bytes(), playerBonesBuffer.Bytes(), time.Now().Add(time.Millisecond))
+		frame, err := processor.ProcessAndDetectEvents(sessionBuffer.Bytes(), playerBonesBuffer.Bytes(), time.Now().Add(time.Millisecond))
 		if err != nil {
 			logger.Error("Failed to process frame", zap.Error(err))
 			continue

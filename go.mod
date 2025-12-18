@@ -1,11 +1,12 @@
-module github.com/echotools/evr-data-recorder/v3
+module github.com/echotools/evr-data-recorder/v4
 
 go 1.25.0
 
 require (
 	github.com/echotools/nevr-common/v4 v4.0.0
-	github.com/echotools/nevrcap v0.0.0-00010101000000-000000000000
+	github.com/echotools/nevrcap/v3 v3.0.0
 	github.com/gofrs/uuid/v5 v5.4.0
+	github.com/google/go-cmp v0.7.0
 	github.com/gorilla/mux v1.8.1
 	github.com/joho/godotenv v1.5.1
 	github.com/spf13/cobra v1.10.2
@@ -54,4 +55,4 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 )
 
-replace github.com/echotools/nevrcap => ../nevrcap
+replace github.com/echotools/nevrcap/v3 => ../nevrcap
