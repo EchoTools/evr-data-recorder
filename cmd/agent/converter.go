@@ -8,7 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/echotools/nevrcap"
+	"github.com/echotools/nevrcap/pkg/codecs"
+	"github.com/echotools/nevrcap/pkg/conversion"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -21,16 +22,16 @@ func newConverterCommand() *cobra.Command {
 		Long: `The converter command converts replay files between the .echoreplay 
 (zip format) and .nevrcap (zstd compressed) formats.`,
 		Example: `  # Convert echoreplay to nevrcap
-  evrtelemetry converter --input game.echoreplay
+	  agent converter --input game.echoreplay
 
   # Convert nevrcap to echoreplay
-  evrtelemetry converter --input game.nevrcap
+	  agent converter --input game.nevrcap
 
   # Force specific output format
-  evrtelemetry converter --input game.echoreplay --format nevrcap
+	  agent converter --input game.echoreplay --format nevrcap
 
   # Specify output file
-  evrtelemetry converter --input game.nevrcap --output converted.echoreplay`,
+	  agent converter --input game.nevrcap --output converted.echoreplay`,
 		RunE: runConverter,
 	}
 
@@ -185,11 +186,11 @@ func convertFile(inputFile, outputFile string) (*ConversionStats, error) {
 
 	// Perform conversion
 	if inputFormat == "echoreplay" && outputFormat == "nevrcap" {
-		if err := nevrcap.ConvertEchoReplayToNevrcap(inputFile, outputFile); err != nil {
+		if err := conversion.ConvertEchoReplayToNevrcap(inputFile, outputFile); err != nil {
 			return nil, err
 		}
 	} else if inputFormat == "nevrcap" && outputFormat == "echoreplay" {
-		if err := nevrcap.ConvertNevrcapToEchoReplay(inputFile, outputFile); err != nil {
+		if err := conversion.ConvertNevrcapToEchoReplay(inputFile, outputFile); err != nil {
 			return nil, err
 		}
 	} else if inputFormat == outputFormat {
@@ -257,7 +258,7 @@ func countFrames(filename string) (int, error) {
 
 	switch format {
 	case "echoreplay":
-		reader, err := nevrcap.NewEchoReplayFileReader(filename)
+		reader, err := codecs.NewEchoReplayReader(filename)
 		if err != nil {
 			return 0, err
 		}
@@ -276,7 +277,7 @@ func countFrames(filename string) (int, error) {
 		return count, nil
 
 	case "nevrcap":
-		reader, err := nevrcap.NewZstdCodecReader(filename)
+		reader, err := codecs.NewNevrCapReader(filename)
 		if err != nil {
 			return 0, err
 		}

@@ -12,7 +12,7 @@ import (
 
 	"github.com/echotools/nevr-common/v4/gen/go/apigame"
 	"github.com/echotools/nevr-common/v4/gen/go/rtapi"
-	"github.com/echotools/nevrcap"
+	"github.com/echotools/nevrcap/pkg/codecs"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -54,16 +54,16 @@ func newReplayerCommand() *cobra.Command {
 		Long: `The replayer command starts an HTTP server that plays back recorded 
 session data from .echoreplay files.`,
 		Example: `  # Replay a single file
-  evrtelemetry replayer game.echoreplay
+	  agent replayer game.echoreplay
 
   # Replay multiple files in sequence
-  evrtelemetry replayer game1.echoreplay game2.echoreplay
+	  agent replayer game1.echoreplay game2.echoreplay
 
   # Replay in loop mode
-  evrtelemetry replayer --loop game.echoreplay
+	  agent replayer --loop game.echoreplay
 
   # Custom bind address
-  evrtelemetry replayer --bind 0.0.0.0:8080 game.echoreplay`,
+	  agent replayer --bind 0.0.0.0:8080 game.echoreplay`,
 		RunE: runReplayer,
 		Args: cobra.MinimumNArgs(1),
 	}
@@ -170,7 +170,7 @@ func (rs *ReplayServer) playFile(filename string) error {
 }
 
 func (rs *ReplayServer) playEchoReplayFile(filename string) error {
-	reader, err := nevrcap.NewEchoReplayFileReader(filename)
+	reader, err := codecs.NewEchoReplayReader(filename)
 	if err != nil {
 		return fmt.Errorf("failed to open echo replay file: %w", err)
 	}

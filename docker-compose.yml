@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: nakama
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - lobby-session-events-network
+
+  session-data-api:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      MONGO_URI: mongodb://admin:password@mongodb:27017/nakama?authSource=admin
+      SERVER_ADDRESS: :8080
+    depends_on:
+      - mongodb
+    networks:
+      - lobby-session-events-network
+
+volumes:
+  mongodb_data:
+
+networks:
+  lobby-session-events-network:
+    driver: bridge

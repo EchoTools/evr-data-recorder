@@ -1,6 +1,6 @@
-# evrtelemetry
+# nevr-agent
 
-A comprehensive suite of tools for recording, converting, and replaying EchoVR game session and player bone data.
+nevr-agent is a single CLI binary (`agent`) for recording, converting, and replaying EchoVR game session and player bone data.
 
 ## Features
 
@@ -18,14 +18,14 @@ A comprehensive suite of tools for recording, converting, and replaying EchoVR g
 
 ### Download Pre-built Binaries
 
-Download the latest release for your platform from the [Releases](https://github.com/EchoTools/evrtelemetry/releases) page.
+Download the latest release for your platform from the [Releases](https://github.com/EchoTools/evr-data-recorder/releases) page.
 
 ### Build from Source
 
 ```bash
 # Clone the repository
-git clone https://github.com/EchoTools/evrtelemetry.git
-cd evrtelemetry
+git clone https://github.com/EchoTools/evr-data-recorder.git
+cd evr-data-recorder
 
 # Build the consolidated binary
 make build
@@ -37,14 +37,14 @@ make windows  # Build for Windows
 
 ## Usage
 
-The `evrtelemetry` application provides a unified CLI with subcommands for different functionality.
+The `agent` application provides a unified CLI with subcommands for different functionality.
 
 ```bash
 # View available commands
-evrtelemetry --help
+agent --help
 
 # Get help for a specific command
-evrtelemetry agent --help
+agent agent --help
 ```
 
 ### Agent - Record Game Data
@@ -53,13 +53,13 @@ Record session and player bone data from EchoVR game servers:
 
 ```bash
 # Basic recording from localhost ports 6721-6730 at 30Hz
-evrtelemetry agent --frequency 30 --output ./output 127.0.0.1:6721-6730
+agent agent --frequency 30 --output ./output 127.0.0.1:6721-6730
 
 # Record with streaming to Nakama server
-evrtelemetry agent --stream --stream-username myuser --stream-password mypass 127.0.0.1:6721
+agent agent --stream --stream-username myuser --stream-password mypass 127.0.0.1:6721
 
 # Record with Events API enabled
-evrtelemetry agent --events --events-url http://localhost:8081 127.0.0.1:6721-6730
+agent agent --events --events-url http://localhost:8081 127.0.0.1:6721-6730
 ```
 
 ### API Server - Session Events API
@@ -68,10 +68,10 @@ Run an HTTP server for storing and retrieving session events:
 
 ```bash
 # Start with default settings
-evrtelemetry apiserver
+agent apiserver
 
 # Custom MongoDB URI and port
-evrtelemetry apiserver --mongo-uri mongodb://localhost:27017 --server-address :8081
+agent apiserver --mongo-uri mongodb://localhost:27017 --server-address :8081
 ```
 
 ### Converter - Format Conversion

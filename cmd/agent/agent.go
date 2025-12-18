@@ -26,13 +26,13 @@ func newAgentCommand() *cobra.Command {
 		Long: `The agent command regularly scans specified ports and starts polling 
 the HTTP API at the configured frequency, storing output to files.`,
 		Example: `  # Record from ports 6721-6730 on localhost at 30Hz
-  evrtelemetry agent --frequency 30 --output ./output 127.0.0.1:6721-6730
+	  agent agent --frequency 30 --output ./output 127.0.0.1:6721-6730
 
   # Record with streaming enabled
-  evrtelemetry agent --stream --stream-username myuser 127.0.0.1:6721-6730
+	  agent agent --stream --stream-username myuser 127.0.0.1:6721-6730
 
   # Use a config file
-  evrtelemetry agent -c config.yaml 127.0.0.1:6721`,
+	  agent agent -c config.yaml 127.0.0.1:6721`,
 		RunE: runAgent,
 	}
 
