@@ -86,7 +86,7 @@ func DefaultConfig() *Config {
 		LogFile:  "",
 		Agent: AgentConfig{
 			Frequency:       10,
-			Format:          "replay",
+			Format:          "nevrcap",
 			OutputDirectory: "output",
 			StreamHTTPURL:   "https://g.echovrce.com:7350",
 			StreamSocketURL: "wss://g.echovrce.com:7350/ws",
@@ -169,6 +169,9 @@ func (c *Config) NewLogger() (*zap.Logger, error) {
 	cfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	cfg.Level.SetLevel(level)
 
+	// Include caller info in log messages (relative path and line number)
+	cfg.EncoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
+
 	if c.LogFile != "" {
 		// Log to file and console
 		cfg.OutputPaths = []string{c.LogFile, "stdout"}
@@ -178,7 +181,7 @@ func (c *Config) NewLogger() (*zap.Logger, error) {
 		cfg.ErrorOutputPaths = []string{"stderr"}
 	}
 
-	logger, err := cfg.Build()
+	logger, err := cfg.Build(zap.AddCaller())
 	if err != nil {
 		return nil, fmt.Errorf("error creating logger: %w", err)
 	}

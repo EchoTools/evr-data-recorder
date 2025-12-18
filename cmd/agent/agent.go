@@ -38,7 +38,7 @@ the HTTP API at the configured frequency, storing output to files.`,
 
 	// Agent-specific flags
 	cmd.Flags().Int("frequency", 10, "Polling frequency in Hz")
-	cmd.Flags().String("format", "replay", "Output format (replay, stream, or comma-separated)")
+	cmd.Flags().String("format", "nevrcap", "Output format (nevrcap, replay, stream, or comma-separated)")
 	cmd.Flags().String("output", "output", "Output directory")
 
 	// Stream options
@@ -52,7 +52,7 @@ the HTTP API at the configured frequency, storing output to files.`,
 
 	// Events API options
 	cmd.Flags().Bool("events", false, "Enable sending frames to events API")
-	cmd.Flags().String("events-url", "http://localhost:8081", "Base URL of the events API")
+	cmd.Flags().String("events-endpoint", "http://localhost:8081", "Base URL of the events API")
 	cmd.Flags().String("events-user-id", "", "Optional user ID header for events API")
 	cmd.Flags().String("events-node-id", "default-node", "Node ID header for events API")
 
@@ -98,10 +98,14 @@ func runAgent(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	logger.Info("Starting agent",
+	logger.Info("NEVR Agent started",
+		zap.String("version", version),
 		zap.Int("frequency", cfg.Agent.Frequency),
 		zap.String("format", cfg.Agent.Format),
 		zap.String("output_directory", cfg.Agent.OutputDirectory),
+		zap.Bool("events_enabled", cfg.Agent.EventsEnabled),
+		zap.String("events_endpoint", cfg.Agent.EventsURL),
+		zap.String("events_node_id", cfg.Agent.EventsNodeID),
 		zap.Any("targets", targets))
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -127,21 +131,25 @@ func runAgent(cmd *cobra.Command, args []string) error {
 }
 
 func startAgent(ctx context.Context, logger *zap.Logger, targets map[string][]int) {
+	// Create custom transport with User-Agent header
+	userAgent := fmt.Sprintf("NEVR-Agent/%s", version)
+	transport := &http.Transport{
+		MaxConnsPerHost:       2,
+		DisableCompression:    true,
+		MaxIdleConns:          2,
+		MaxIdleConnsPerHost:   2,
+		IdleConnTimeout:       5 * time.Second,
+		TLSHandshakeTimeout:   2 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		DialContext: (&net.Dialer{
+			Timeout:   2 * time.Second,
+			KeepAlive: 5 * time.Second,
+		}).DialContext,
+	}
+
 	client := &http.Client{
-		Timeout: 3 * time.Second,
-		Transport: &http.Transport{
-			MaxConnsPerHost:       2,
-			DisableCompression:    true,
-			MaxIdleConns:          2,
-			MaxIdleConnsPerHost:   2,
-			IdleConnTimeout:       5 * time.Second,
-			TLSHandshakeTimeout:   2 * time.Second,
-			ExpectContinueTimeout: 1 * time.Second,
-			DialContext: (&net.Dialer{
-				Timeout:   2 * time.Second,
-				KeepAlive: 5 * time.Second,
-			}).DialContext,
-		},
+		Timeout:   3 * time.Second,
+		Transport: &userAgentTransport{Transport: transport, UserAgent: userAgent},
 	}
 
 	sessions := make(map[string]agent.FrameWriter)
@@ -228,6 +236,12 @@ OuterLoop:
 							}
 							logger.Info("Stream writer connected successfully")
 							fw = rtapiWriter
+						case "nevrcap":
+							filename = agent.NevrCapSessionFilename(time.Now(), meta.SessionUUID)
+							outputPath = filepath.Join(cfg.Agent.OutputDirectory, filename)
+							nevrCapWriter := agent.NewNevrCapLogSession(ctx, logger, outputPath, meta.SessionUUID)
+							go nevrCapWriter.ProcessFrames()
+							fw = nevrCapWriter
 						case "replay":
 							fallthrough
 						default:
@@ -251,6 +265,12 @@ OuterLoop:
 						}
 						logger.Info("Stream writer connected successfully")
 						fileWriter = rtapiWriter
+					case "nevrcap":
+						filename = agent.NevrCapSessionFilename(time.Now(), meta.SessionUUID)
+						outputPath = filepath.Join(cfg.Agent.OutputDirectory, filename)
+						nevrCapWriter := agent.NewNevrCapLogSession(ctx, logger, outputPath, meta.SessionUUID)
+						go nevrCapWriter.ProcessFrames()
+						fileWriter = nevrCapWriter
 					case "replay":
 						fallthrough
 					default:
@@ -367,4 +387,15 @@ func parsePortRange(port string) ([]int, error) {
 		}
 	}
 	return ports, nil
+}
+
+// userAgentTransport is a custom RoundTripper that adds User-Agent header to all requests
+type userAgentTransport struct {
+	Transport *http.Transport
+	UserAgent string
+}
+
+func (t *userAgentTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.Header.Set("User-Agent", t.UserAgent)
+	return t.Transport.RoundTrip(req)
 }

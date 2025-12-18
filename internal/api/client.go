@@ -19,14 +19,16 @@ type Client struct {
 	httpClient *http.Client
 	userID     string
 	nodeID     string
+	userAgent  string
 }
 
 // ClientConfig holds configuration for the session events client
 type ClientConfig struct {
-	BaseURL string        // Base URL of the session events service (e.g., "http://localhost:8080")
-	Timeout time.Duration // HTTP request timeout (default: 30 seconds)
-	UserID  string        // User ID to include in requests
-	NodeID  string        // Node ID to include in requests
+	BaseURL   string        // Base URL of the session events service (e.g., "http://localhost:8080")
+	Timeout   time.Duration // HTTP request timeout (default: 30 seconds)
+	UserID    string        // User ID to include in requests
+	NodeID    string        // Node ID to include in requests
+	UserAgent string        // User-Agent header value
 }
 
 // NewClient creates a new session events client
@@ -39,13 +41,18 @@ func NewClient(config ClientConfig) *Client {
 		config.NodeID = "default-node"
 	}
 
+	if config.UserAgent == "" {
+		config.UserAgent = "NEVR-Agent"
+	}
+
 	return &Client{
 		baseURL: config.BaseURL,
 		httpClient: &http.Client{
 			Timeout: config.Timeout,
 		},
-		userID: config.UserID,
-		nodeID: config.NodeID,
+		userID:    config.UserID,
+		nodeID:    config.NodeID,
+		userAgent: config.UserAgent,
 	}
 }
 
@@ -84,6 +91,7 @@ func (c *Client) StoreSessionEvent(ctx context.Context, event *rtapi.LobbySessio
 
 	// Set headers
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", c.userAgent)
 	if c.userID != "" {
 		req.Header.Set("X-User-ID", c.userID)
 	}
@@ -132,6 +140,7 @@ func (c *Client) GetSessionEvents(ctx context.Context, lobbySessionUUID string) 
 
 	// Set headers
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", c.userAgent)
 	if c.userID != "" {
 		req.Header.Set("X-User-ID", c.userID)
 	}
@@ -176,6 +185,7 @@ func (c *Client) HealthCheck(ctx context.Context) (*HealthResponse, error) {
 
 	// Set headers
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", c.userAgent)
 
 	// Send request
 	resp, err := c.httpClient.Do(req)

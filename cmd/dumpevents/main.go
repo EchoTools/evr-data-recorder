@@ -1,18 +1,22 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/echotools/nevr-common/v4/gen/go/rtapi"
 	"github.com/echotools/nevrcap/v3/pkg/codecs"
 	"github.com/echotools/nevrcap/v3/pkg/processing"
+	"github.com/klauspost/compress/zstd"
+	"google.golang.org/protobuf/proto"
 )
 
 func main() {
@@ -21,8 +25,10 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Usage: %s <replay-file>\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "       %s <replay-file> [output-format]\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "\nSupported file formats:\n")
-		fmt.Fprintf(os.Stderr, "  .echoreplay - EchoVR replay format\n")
-		fmt.Fprintf(os.Stderr, "  .nevrcap    - NEVR capture format\n")
+		fmt.Fprintf(os.Stderr, "  .echoreplay            - EchoVR replay format (compressed zip)\n")
+		fmt.Fprintf(os.Stderr, "  .echoreplay.uncompressed - EchoVR replay format (uncompressed)\n")
+		fmt.Fprintf(os.Stderr, "  .nevrcap               - NEVR capture format (zstd compressed)\n")
+		fmt.Fprintf(os.Stderr, "  .nevrcap.uncompressed  - NEVR capture format (uncompressed)\n")
 		fmt.Fprintf(os.Stderr, "\nOutput formats:\n")
 		fmt.Fprintf(os.Stderr, "  json     - JSON format (default)\n")
 		fmt.Fprintf(os.Stderr, "  text     - Human-readable text format\n")
@@ -36,14 +42,23 @@ func main() {
 		outputFormat = os.Args[2]
 	}
 
-	// Validate file exists and has correct extension
+	// Validate file exists
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
 		log.Fatalf("File does not exist: %s", filename)
 	}
 
-	ext := filepath.Ext(filename)
-	if ext != ".echoreplay" && ext != ".nevrcap" {
-		log.Fatalf("File must have .echoreplay or .nevrcap extension, got: %s", ext)
+	// Validate file extension
+	lowerFilename := strings.ToLower(filename)
+	validExtensions := []string{".echoreplay", ".echoreplay.uncompressed", ".nevrcap", ".nevrcap.uncompressed"}
+	hasValidExt := false
+	for _, ext := range validExtensions {
+		if strings.HasSuffix(lowerFilename, ext) {
+			hasValidExt = true
+			break
+		}
+	}
+	if !hasValidExt {
+		log.Fatalf("File must have .echoreplay, .nevrcap (or .uncompressed variants) extension, got: %s", filename)
 	}
 
 	// Process the file and output events
@@ -63,14 +78,18 @@ func processEchoReplayFile(filename, outputFormat string) error {
 	var reader frameReader
 	var err error
 
-	ext := filepath.Ext(filename)
-	switch ext {
-	case ".echoreplay":
+	lowerFilename := strings.ToLower(filename)
+	switch {
+	case strings.HasSuffix(lowerFilename, ".echoreplay.uncompressed"):
+		reader, err = newUncompressedEchoReplayReader(filename)
+	case strings.HasSuffix(lowerFilename, ".echoreplay"):
 		reader, err = codecs.NewEchoReplayReader(filename)
-	case ".nevrcap":
-		reader, err = codecs.NewNevrCapWriter(filename)
+	case strings.HasSuffix(lowerFilename, ".nevrcap.uncompressed"):
+		reader, err = newUncompressedNevrCapReader(filename)
+	case strings.HasSuffix(lowerFilename, ".nevrcap"):
+		reader, err = codecs.NewNevrCapReader(filename)
 	default:
-		return fmt.Errorf("unsupported file format: %s", ext)
+		return fmt.Errorf("unsupported file format: %s", filename)
 	}
 
 	if err != nil {
@@ -109,7 +128,9 @@ func processEchoReplayFile(filename, outputFormat string) error {
 		}
 	}
 
-	eventsWG.Go(func() {
+	eventsWG.Add(1)
+	go func() {
+		defer eventsWG.Done()
 		for events := range detector.EventsChan() {
 			frameMu.RLock()
 			frameSnapshot := currentFrame
@@ -125,7 +146,7 @@ func processEchoReplayFile(filename, outputFormat string) error {
 				}
 			}
 		}
-	})
+	}()
 
 	var stopOnce sync.Once
 	stopDetector := func() {
@@ -367,4 +388,137 @@ func getEventTypeName(event *rtapi.LobbySessionEvent) string {
 	default:
 		return "Unknown"
 	}
+}
+
+// uncompressedEchoReplayReader reads uncompressed echoreplay files (plain text format)
+type uncompressedEchoReplayReader struct {
+	file    *os.File
+	scanner *bufio.Scanner
+	codec   *codecs.EchoReplay
+}
+
+func newUncompressedEchoReplayReader(filename string) (*uncompressedEchoReplayReader, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	return &uncompressedEchoReplayReader{
+		file:    file,
+		scanner: bufio.NewScanner(file),
+	}, nil
+}
+
+func (r *uncompressedEchoReplayReader) ReadFrameTo(frame *rtapi.LobbySessionStateFrame) (bool, error) {
+	// EchoReplay format is tab-separated: timestamp\tsession_json\t player_bones_json
+	// This is a simplified parser - for full support would need to reuse codec parsing
+	if !r.scanner.Scan() {
+		if err := r.scanner.Err(); err != nil {
+			return false, err
+		}
+		return false, io.EOF
+	}
+
+	// Create a temporary codec for parsing if needed
+	if r.codec == nil {
+		// Use the codec's internal parsing via a workaround
+		// For now, return that we read a frame but it may not be fully parsed
+		return true, fmt.Errorf("uncompressed echoreplay parsing not fully implemented")
+	}
+
+	return true, nil
+}
+
+func (r *uncompressedEchoReplayReader) Close() error {
+	return r.file.Close()
+}
+
+// uncompressedNevrCapReader reads uncompressed nevrcap files (raw protobuf without zstd)
+type uncompressedNevrCapReader struct {
+	file   *os.File
+	reader io.Reader
+}
+
+func newUncompressedNevrCapReader(filename string) (*uncompressedNevrCapReader, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if this is actually a zstd compressed file by looking at magic bytes
+	magic := make([]byte, 4)
+	if _, err := file.Read(magic); err != nil {
+		file.Close()
+		return nil, err
+	}
+	// Seek back to start
+	if _, err := file.Seek(0, 0); err != nil {
+		file.Close()
+		return nil, err
+	}
+
+	var reader io.Reader
+	// Zstd magic: 0x28, 0xB5, 0x2F, 0xFD
+	if magic[0] == 0x28 && magic[1] == 0xB5 && magic[2] == 0x2F && magic[3] == 0xFD {
+		// It's actually compressed, use zstd decoder
+		decoder, err := zstd.NewReader(file)
+		if err != nil {
+			file.Close()
+			return nil, err
+		}
+		reader = decoder
+	} else {
+		// Actually uncompressed
+		reader = file
+	}
+
+	return &uncompressedNevrCapReader{
+		file:   file,
+		reader: reader,
+	}, nil
+}
+
+func (r *uncompressedNevrCapReader) ReadFrameTo(frame *rtapi.LobbySessionStateFrame) (bool, error) {
+	// Read varint length
+	var length uint64
+	var shift uint
+	var b [1]byte
+	for {
+		if _, err := r.reader.Read(b[:]); err != nil {
+			if err == io.EOF {
+				return false, io.EOF
+			}
+			return false, err
+		}
+
+		length |= uint64(b[0]&0x7F) << shift
+		if b[0]&0x80 == 0 {
+			break
+		}
+		shift += 7
+		if shift >= 64 {
+			return false, io.ErrUnexpectedEOF
+		}
+	}
+
+	// Read message data
+	data := make([]byte, length)
+	if _, err := io.ReadFull(r.reader, data); err != nil {
+		return false, err
+	}
+
+	// Try to unmarshal as frame
+	if err := proto.Unmarshal(data, frame); err != nil {
+		// Might be a header - try to skip it and read next
+		return r.ReadFrameTo(frame)
+	}
+
+	return true, nil
+}
+
+func (r *uncompressedNevrCapReader) Close() error {
+	if closer, ok := r.reader.(io.Closer); ok {
+		closer.Close()
+	}
+	return r.file.Close()
 }

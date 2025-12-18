@@ -48,6 +48,7 @@ func NewHTTPFramePoller(ctx context.Context, logger *zap.Logger, client *http.Cl
 		logger.Debug("HTTP frame poller done", zap.Int("request_count", requestCount), zap.Int("data_written", dataWritten))
 	}()
 
+	enableDebugLogging := logger.Core().Enabled(zap.DebugLevel)
 	timeoutTimer := time.NewTimer(5 * time.Second)
 	for {
 
@@ -72,14 +73,26 @@ func NewHTTPFramePoller(ctx context.Context, logger *zap.Logger, client *http.Cl
 				defer wg.Done()
 				resp, err := client.Get(url)
 				if err != nil {
-					logger.Warn("Failed to fetch data from URL", zap.String("url", url), zap.Error(err))
+					if enableDebugLogging {
+						logger.Debug("Failed to fetch data from URL", zap.String("url", url), zap.Error(err))
+					}
 					return
 				}
 				defer resp.Body.Close()
 
 				if resp.StatusCode != http.StatusOK {
-					logger.Warn("Received non-OK response from URL", zap.String("url", url), zap.Int("status_code", resp.StatusCode))
-					// If the response is not OK, we can skip processing this URL
+					if resp.StatusCode == http.StatusNotFound {
+						if enableDebugLogging {
+							// The game is in transition. Try again after a slight delay.
+							logger.Debug("Received 404 Not Found from URL, likely game transition", zap.String("url", url))
+						}
+						time.Sleep(500 * time.Millisecond)
+						return
+					}
+
+					logger.Debug("Received unexpected response code response from URL", zap.String("url", url), zap.Int("status_code", resp.StatusCode), zap.String("response_body", resp.Status))
+					// If the response is not OK, skip processing this URL
+					time.Sleep(500 * time.Millisecond)
 					return
 				}
 
