@@ -15,6 +15,25 @@ services:
     networks:
       - lobby-session-events-network
 
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - lobby-session-events-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
   session-data-api:
     build: .
     restart: unless-stopped
@@ -23,13 +42,20 @@ services:
     environment:
       MONGO_URI: mongodb://admin:password@mongodb:27017/nakama?authSource=admin
       SERVER_ADDRESS: :8080
+      AMQP_URI: amqp://guest:guest@rabbitmq:5672/
+      AMQP_ENABLED: "true"
+      EVR_APISERVER_CORS_ORIGINS: "*"
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
     networks:
       - lobby-session-events-network
 
 volumes:
   mongodb_data:
+  rabbitmq_data:
 
 networks:
   lobby-session-events-network:

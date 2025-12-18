@@ -7,11 +7,12 @@ import (
 
 	"github.com/gofrs/uuid/v5"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// StoreSessionEvent stores a session event to MongoDB
+// StoreSessionEvent stores a session event to MongoDB with v3 schema
 func StoreSessionEvent(ctx context.Context, mongoClient *mongo.Client, event *SessionEvent) error {
 	if mongoClient == nil {
 		return fmt.Errorf("mongo client is nil")
@@ -25,6 +26,19 @@ func StoreSessionEvent(ctx context.Context, mongoClient *mongo.Client, event *Se
 
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
+
+	// Set timestamps for new documents
+	now := time.Now().UTC()
+	if event.ID.IsZero() {
+		event.ID = primitive.NewObjectID()
+	}
+	if event.Timestamp.IsZero() {
+		event.Timestamp = now
+	}
+	if event.CreatedAt.IsZero() {
+		event.CreatedAt = now
+	}
+	event.UpdatedAt = now
 
 	_, err := collection.InsertOne(ctx, event)
 	if err != nil {
@@ -67,4 +81,56 @@ func RetrieveSessionEventsByMatchID(ctx context.Context, mongoClient *mongo.Clie
 	}
 
 	return events, nil
+}
+
+// RetrieveSessionEventsPaginated retrieves session events with pagination support for v3 API
+func RetrieveSessionEventsPaginated(ctx context.Context, mongoClient *mongo.Client, matchID string, limit, offset int64) ([]*SessionEvent, int64, error) {
+	if mongoClient == nil {
+		return nil, 0, fmt.Errorf("mongo client is nil")
+	}
+
+	if matchID == "" {
+		return nil, 0, fmt.Errorf("lobby_session_id is required")
+	}
+
+	collection := mongoClient.Database(sessionEventDatabaseName).Collection(sessionEventCollectionName)
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	// Create filter for lobby_session_id
+	filter := bson.M{"lobby_session_id": matchID}
+
+	// Get total count
+	totalCount, err := collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to count session events: %w", err)
+	}
+
+	// Set defaults for pagination
+	if limit <= 0 {
+		limit = 100
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+
+	// Sort by timestamp ascending with pagination
+	opts := options.Find().
+		SetSort(bson.D{{Key: "timestamp", Value: 1}}).
+		SetSkip(offset).
+		SetLimit(limit)
+
+	cursor, err := collection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to query session events: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var events []*SessionEvent
+	if err := cursor.All(ctx, &events); err != nil {
+		return nil, 0, fmt.Errorf("failed to decode session events: %w", err)
+	}
+
+	return events, totalCount, nil
 }
