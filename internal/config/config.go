@@ -183,11 +183,25 @@ func (c *Config) ValidateAgentConfig() error {
 	if c.Agent.Frequency <= 0 {
 		return fmt.Errorf("frequency must be greater than 0")
 	}
-	if c.Agent.OutputDirectory == "" {
-		return fmt.Errorf("output directory must be specified")
+
+	// Check if we need to validate output directory
+	needsOutput := false
+	formats := strings.Split(c.Agent.Format, ",")
+	for _, f := range formats {
+		f = strings.TrimSpace(f)
+		if f != "" && f != "none" {
+			needsOutput = true
+			break
+		}
 	}
-	if err := os.MkdirAll(c.Agent.OutputDirectory, 0755); err != nil {
-		return fmt.Errorf("failed to create output directory: %w", err)
+
+	if needsOutput {
+		if c.Agent.OutputDirectory == "" {
+			return fmt.Errorf("output directory must be specified for format %s", c.Agent.Format)
+		}
+		if err := os.MkdirAll(c.Agent.OutputDirectory, 0755); err != nil {
+			return fmt.Errorf("failed to create output directory: %w", err)
+		}
 	}
 	return nil
 }

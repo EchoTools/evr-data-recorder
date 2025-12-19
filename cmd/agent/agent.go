@@ -186,32 +186,19 @@ OuterLoop:
 
 				var filename string
 				var outputPath string
-				var fileWriter agent.FrameWriter
+
+				writers := make([]agent.FrameWriter, 0)
 
 				// Create the appropriate file writer based on format
 				formats := strings.Split(cfg.Agent.Format, ",")
 
-				if len(formats) > 1 {
-					// Create multi-writer
-					writers := make([]agent.FrameWriter, 0, len(formats))
-					for _, format := range formats {
-						format = strings.TrimSpace(format)
-						var fw agent.FrameWriter
-						switch format {
-						case "replay":
-							fallthrough
-						default:
-							filename = agent.EchoReplaySessionFilename(time.Now(), meta.SessionUUID)
-							outputPath = filepath.Join(cfg.Agent.OutputDirectory, filename)
-							replayWriter := agent.NewFrameDataLogSession(ctx, logger, outputPath, meta.SessionUUID)
-							go replayWriter.ProcessFrames()
-							fw = replayWriter
-						}
-						writers = append(writers, fw)
+				for _, format := range formats {
+					format = strings.TrimSpace(format)
+					if format == "" || format == "none" {
+						continue
 					}
-					fileWriter = agent.NewMultiWriter(logger, writers...)
-				} else {
-					switch formats[0] {
+
+					switch format {
 					case "replay":
 						fallthrough
 					default:
@@ -219,18 +206,19 @@ OuterLoop:
 						outputPath = filepath.Join(cfg.Agent.OutputDirectory, filename)
 						replayWriter := agent.NewFrameDataLogSession(ctx, logger, outputPath, meta.SessionUUID)
 						go replayWriter.ProcessFrames()
-						fileWriter = replayWriter
+						writers = append(writers, replayWriter)
 					}
 				}
 
-				logger = logger.With(zap.String("session_uuid", meta.SessionUUID), zap.String("filename", filename))
-
-				var session agent.FrameWriter = fileWriter
+				logger = logger.With(zap.String("session_uuid", meta.SessionUUID))
+				if filename != "" {
+					logger = logger.With(zap.String("filename", filename))
+				}
 
 				// If events sending is enabled, add EventsAPI writer
 				if cfg.Agent.EventsEnabled {
 					eventsWriter := agent.NewEventsAPIWriter(logger, cfg.Agent.EventsURL, cfg.Agent.JWTToken)
-					session = agent.NewMultiWriter(logger, session, eventsWriter)
+					writers = append(writers, eventsWriter)
 				}
 				// If events streaming is enabled, add WebSocket writer
 				if viper.GetBool("events-stream") {
@@ -249,8 +237,20 @@ OuterLoop:
 						logger.Error("Failed to connect WebSocket writer", zap.Error(err))
 					} else {
 						logger.Info("WebSocket writer connected successfully", zap.String("url", wsURL))
-						session = agent.NewMultiWriter(logger, session, wsWriter)
+						writers = append(writers, wsWriter)
 					}
+				}
+
+				if len(writers) == 0 {
+					logger.Warn("No output format or destination specified, skipping session")
+					continue
+				}
+
+				var session agent.FrameWriter
+				if len(writers) == 1 {
+					session = writers[0]
+				} else {
+					session = agent.NewMultiWriter(logger, writers...)
 				}
 
 				sessions[baseURL] = session
