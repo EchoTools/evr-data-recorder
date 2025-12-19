@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/echotools/nevr-agent/internal/api"
+	"github.com/echotools/nevr-agent/v4/internal/api"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.mongodb.org/mongo-driver/mongo"

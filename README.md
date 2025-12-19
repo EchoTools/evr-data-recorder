@@ -20,7 +20,7 @@ NEVR Agent is a unified CLI for recording, streaming, converting, and replaying 
 
 ### Download Pre-built Binaries
 
-Download the latest release for your platform from the [Releases](https://github.com/EchoTools/nevr-agent/releases) page.
+Download the latest release for your platform from the [Releases](https://github.com/echotools/nevr-agent/v4/releases) page.
 
 ### Use Container Image
 

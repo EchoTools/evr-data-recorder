@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/echotools/nevr-agent/internal/agent"
-	"github.com/echotools/nevr-agent/internal/config"
+	"github.com/echotools/nevr-agent/v4/internal/agent"
+	"github.com/echotools/nevr-agent/v4/internal/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"

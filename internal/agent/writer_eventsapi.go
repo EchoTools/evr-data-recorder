@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	api "github.com/echotools/nevr-agent/internal/api"
+	api "github.com/echotools/nevr-agent/v4/internal/api"
 	rtapi "github.com/echotools/nevr-common/v4/gen/go/rtapi"
 	"go.uber.org/zap"
 )
