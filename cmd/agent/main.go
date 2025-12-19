@@ -73,6 +73,7 @@ serving recorded data.`,
 	rootCmd.AddCommand(newAPIServerCommand())
 	rootCmd.AddCommand(newConverterCommand())
 	rootCmd.AddCommand(newReplayerCommand())
+	rootCmd.AddCommand(newVersionCheckCommand())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
