@@ -74,9 +74,12 @@ func NewServer(mongoClient *mongo.Client, logger Logger) *Server {
 		logger = &DefaultLogger{}
 	}
 
+	router := mux.NewRouter()
+	router.StrictSlash(true) // Handle trailing slashes consistently
+
 	s := &Server{
 		mongoClient:     mongoClient,
-		router:          mux.NewRouter(),
+		router:          router,
 		logger:          logger,
 		graphqlResolver: graph.NewResolver(mongoClient),
 		corsHandler:     createCORSHandler(),
@@ -121,10 +124,12 @@ func (s *Server) setupRoutes() {
 	// v1 API - Legacy endpoints (backward compatible)
 	// ============================================
 	v1 := s.router.PathPrefix("/v1").Subrouter()
+	v1.Use(s.corsOptionsMiddleware)
 	v1.HandleFunc("/lobby-session-events", s.storeSessionEventHandler).Methods("POST")
 	v1.HandleFunc("/lobby-session-events/{lobby_session_id}", s.getSessionEventsHandlerV1).Methods("GET")
 
 	// Legacy routes without version prefix (deprecated, redirects to v1)
+	s.router.Use(s.corsOptionsMiddleware)
 	s.router.HandleFunc("/lobby-session-events", s.storeSessionEventHandler).Methods("POST")
 	s.router.HandleFunc("/lobby-session-events/{lobby_session_id}", s.getSessionEventsHandlerV1).Methods("GET")
 
@@ -132,10 +137,11 @@ func (s *Server) setupRoutes() {
 	// v3 API - New GraphQL and REST endpoints
 	// ============================================
 	v3 := s.router.PathPrefix("/v3").Subrouter()
+	v3.Use(s.corsOptionsMiddleware)
 
 	// GraphQL endpoint
-	v3.Handle("/query", s.graphqlResolver.Handler()).Methods("POST", "OPTIONS")
-	v3.Handle("/graphql", s.graphqlResolver.Handler()).Methods("POST", "OPTIONS")
+	v3.Handle("/query", s.graphqlResolver.Handler()).Methods("POST")
+	v3.Handle("/graphql", s.graphqlResolver.Handler()).Methods("POST")
 
 	// GraphQL Playground (development tool)
 	v3.Handle("/playground", graph.PlaygroundHandler("/v3/query")).Methods("GET")
@@ -143,10 +149,42 @@ func (s *Server) setupRoutes() {
 	// v3 REST endpoints (optional, for those who prefer REST over GraphQL)
 	v3.HandleFunc("/lobby-session-events", s.storeSessionEventHandlerV3).Methods("POST")
 	v3.HandleFunc("/lobby-session-events/{lobby_session_id}", s.getSessionEventsHandlerV3).Methods("GET")
+
+	// Add a NotFoundHandler for debugging unmatched routes
+	s.router.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.logger.Warn("Route not found", "method", r.Method, "path", r.URL.Path)
+		http.Error(w, "404 page not found", http.StatusNotFound)
+	})
+
+	// Add a MethodNotAllowedHandler for debugging method mismatches
+	s.router.MethodNotAllowedHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.logger.Warn("Method not allowed", "method", r.Method, "path", r.URL.Path)
+		http.Error(w, "405 method not allowed", http.StatusMethodNotAllowed)
+	})
+}
+
+// corsOptionsMiddleware handles CORS preflight OPTIONS requests
+func (s *Server) corsOptionsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodOptions {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, X-Node-ID, X-User-ID")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // storeSessionEventHandler handles POST requests to store session events
 func (s *Server) storeSessionEventHandler(w http.ResponseWriter, r *http.Request) {
+	// Log incoming request for debugging
+	s.logger.Debug("Received request",
+		"method", r.Method,
+		"path", r.URL.Path,
+		"content_type", r.Header.Get("Content-Type"))
+
 	ctx := r.Context()
 
 	var payload json.RawMessage

@@ -207,7 +207,7 @@ OuterLoop:
 				default:
 				}
 
-				logger := logger.With(zap.Int("port", port))
+				logger := logger.With(zap.String("host_addresss", fmt.Sprintf("%s:%d", host, port)))
 				baseURL := fmt.Sprintf("http://%s:%d", host, port)
 
 				if s, found := sessions[baseURL]; found {
@@ -311,7 +311,7 @@ OuterLoop:
 					}
 				}
 
-				logger = logger.With(zap.String("session_uuid", meta.SessionUUID), zap.String("filename", filename))
+				logger = logger.With(zap.String("session_uuid", meta.SessionUUID))
 
 				var session agent.FrameWriter = fileWriter
 
