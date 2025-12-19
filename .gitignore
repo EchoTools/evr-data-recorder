@@ -25,8 +25,9 @@
 go.work
 go.work.sum
 
-# env file
+# Environment files - .env contains secrets, .env.example is template
 .env
+.env.compose
 
 # binary
 /evrtelemetry

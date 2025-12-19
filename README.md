@@ -20,6 +20,22 @@ nevr-agent is a single CLI binary (`agent`) for recording, converting, and repla
 
 Download the latest release for your platform from the [Releases](https://github.com/EchoTools/evr-data-recorder/releases) page.
 
+### Use Container Image
+
+The project is published to GitHub Container Registry (ghcr.io). Pull the latest image:
+
+```bash
+docker pull ghcr.io/echotools/evr-data-recorder:latest
+```
+
+Run the API server in a container with dependencies:
+
+```bash
+docker-compose up
+```
+
+For detailed information on building and pushing container images, see [CONTAINER_PUBLISHING.md](CONTAINER_PUBLISHING.md).
+
 ### Build from Source
 
 ```bash

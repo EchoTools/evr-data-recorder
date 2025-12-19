@@ -30,5 +30,12 @@ EXPOSE 8080
 ENV MONGO_URI=mongodb://localhost:27017
 ENV SERVER_ADDRESS=:8080
 
+# Add metadata labels for container registry
+LABEL org.opencontainers.image.title="EVR Data Recorder API Server"
+LABEL org.opencontainers.image.description="Session event recording and API server for Echo VR"
+LABEL org.opencontainers.image.url="https://github.com/EchoTools/evr-data-recorder"
+LABEL org.opencontainers.image.source="https://github.com/EchoTools/evr-data-recorder"
+LABEL org.opencontainers.image.vendor="EchoTools"
+
 # Run the binary
 CMD ["./apiserver"]
