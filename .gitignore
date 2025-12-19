@@ -29,13 +29,11 @@ go.work.sum
 .env
 .env.compose
 
+# Log files
+agent.log
+
 # binary
-/evrtelemetry
-/evrtelemetry.exe
 /agent
-/replayer
-/converter
-/apiserver
-/dumpevents
-/webviewer
+/agent.exe
+/validator
 output/

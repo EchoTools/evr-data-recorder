@@ -17,7 +17,7 @@ WINDOWS_BINARY := $(BINARY).exe
 .DEFAULT_GOAL := help
 
 help:
-	@echo "EVR Data Recorder - Available targets:"
+	@echo "NEVR Agent - Available targets:"
 	@echo ""
 	@echo "  make help              Show this help message"
 	@echo "  make all               Clean, test, and build for all platforms"

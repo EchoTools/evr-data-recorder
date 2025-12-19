@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/echotools/evr-data-recorder/v4/internal/config"
+	"github.com/echotools/nevr-agent/internal/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -73,6 +73,8 @@ serving recorded data.`,
 	rootCmd.AddCommand(newAPIServerCommand())
 	rootCmd.AddCommand(newConverterCommand())
 	rootCmd.AddCommand(newReplayerCommand())
+	rootCmd.AddCommand(newDumpEventsCommand())
+	rootCmd.AddCommand(newMigrateCommand())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

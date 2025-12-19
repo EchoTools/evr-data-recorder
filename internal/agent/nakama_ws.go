@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -25,9 +24,7 @@ type NakamaWebSocketClient struct {
 	httpURL      string
 	socketURL    string
 	serverKey    string
-	httpKey      string
-	username     string
-	password     string
+	jwtToken     string
 	httpClient   *http.Client
 	conn         *websocket.Conn
 	sessionToken string
@@ -42,17 +39,15 @@ type AuthenticateCustomRequest struct {
 	Username string             `json:"username,omitempty"`
 }
 
-func NewStreamClient(logger *zap.Logger, httpURL, socketURL, httpKey, serverKey, username, password string) *NakamaWebSocketClient {
+func NewStreamClient(logger *zap.Logger, httpURL, socketURL, jwtToken, serverKey string) *NakamaWebSocketClient {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &NakamaWebSocketClient{
 		logger: logger,
 
 		httpURL:   httpURL,
 		socketURL: socketURL,
-		httpKey:   httpKey,
+		jwtToken:  jwtToken,
 		serverKey: serverKey,
-		username:  username,
-		password:  password,
 
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		outgoingCh: make(chan []byte, 100),
@@ -62,61 +57,16 @@ func NewStreamClient(logger *zap.Logger, httpURL, socketURL, httpKey, serverKey,
 }
 
 func (sc *NakamaWebSocketClient) Connect() error {
-	// Step 1: Authenticate and get session token
-	if err := sc.authenticate(); err != nil {
-		return fmt.Errorf("authentication failed: %w", err)
-	}
+	// Use the provided JWT token directly
+	sc.sessionToken = sc.jwtToken
 
-	// Step 2: Connect to websocket
+	// Connect to websocket
 	if err := sc.connectWebSocket(); err != nil {
 		return fmt.Errorf("websocket connection failed: %w", err)
 	}
 
-	// Step 4: Start message handling goroutine
+	// Start message handling goroutine
 	go sc.processIncoming()
-
-	return nil
-}
-
-func (sc *NakamaWebSocketClient) authenticate() error {
-	request := map[string]any{
-		"username": sc.username,
-		"password": sc.password,
-	}
-
-	reqBody, err := json.Marshal(request)
-	if err != nil {
-		return fmt.Errorf("failed to marshal auth request: %w", err)
-	}
-
-	// Build the URL
-	url := fmt.Sprintf(sc.httpURL+"/v2/rpc/account/authenticate/password?unwrap&http_key=%s", sc.httpKey)
-
-	req, err := http.NewRequestWithContext(sc.ctx, "POST", url, bytes.NewBuffer(reqBody))
-	if err != nil {
-		return fmt.Errorf("failed to create auth request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	//req.Header.Set("Authorization", "Bearer "+sc.serverKey)
-
-	resp, err := sc.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to send auth request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("auth request failed with status: %d", resp.StatusCode)
-	}
-
-	var session api.Session
-	if err := json.NewDecoder(resp.Body).Decode(&session); err != nil {
-		return fmt.Errorf("failed to decode session response: %w", err)
-	}
-
-	sc.sessionToken = session.Token
-	sc.logger.Info("Successfully authenticated", zap.String("token_prefix", sc.sessionToken[:10]+"..."))
 
 	return nil
 }

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/echotools/evr-data-recorder/v4/internal/amqp"
-	"github.com/echotools/evr-data-recorder/v4/internal/api/graph"
+	"github.com/echotools/nevr-agent/internal/amqp"
+	"github.com/echotools/nevr-agent/internal/api/graph"
 	"github.com/echotools/nevr-common/v4/gen/go/rtapi"
 	"github.com/gofrs/uuid/v5"
 	"github.com/gorilla/mux"

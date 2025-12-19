@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/echotools/evr-data-recorder/v4/internal/api"
+	"github.com/echotools/nevr-agent/internal/api"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"

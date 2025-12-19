@@ -17,8 +17,7 @@ import (
 type Client struct {
 	baseURL    string
 	httpClient *http.Client
-	userID     string
-	nodeID     string
+	jwtToken   string
 	userAgent  string
 }
 
@@ -26,8 +25,7 @@ type Client struct {
 type ClientConfig struct {
 	BaseURL   string        // Base URL of the session events service (e.g., "http://localhost:8080")
 	Timeout   time.Duration // HTTP request timeout (default: 30 seconds)
-	UserID    string        // User ID to include in requests
-	NodeID    string        // Node ID to include in requests
+	JWTToken  string        // JWT token for authentication
 	UserAgent string        // User-Agent header value
 }
 
@@ -35,10 +33,6 @@ type ClientConfig struct {
 func NewClient(config ClientConfig) *Client {
 	if config.Timeout == 0 {
 		config.Timeout = 30 * time.Second
-	}
-
-	if config.NodeID == "" {
-		config.NodeID = "default-node"
 	}
 
 	if config.UserAgent == "" {
@@ -50,8 +44,7 @@ func NewClient(config ClientConfig) *Client {
 		httpClient: &http.Client{
 			Timeout: config.Timeout,
 		},
-		userID:    config.UserID,
-		nodeID:    config.NodeID,
+		jwtToken:  config.JWTToken,
 		userAgent: config.UserAgent,
 	}
 }
@@ -92,11 +85,8 @@ func (c *Client) StoreSessionEvent(ctx context.Context, event *rtapi.LobbySessio
 	// Set headers
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", c.userAgent)
-	if c.userID != "" {
-		req.Header.Set("X-User-ID", c.userID)
-	}
-	if c.nodeID != "" {
-		req.Header.Set("X-Node-ID", c.nodeID)
+	if c.jwtToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.jwtToken)
 	}
 
 	// Send request
@@ -141,11 +131,8 @@ func (c *Client) GetSessionEvents(ctx context.Context, lobbySessionUUID string) 
 	// Set headers
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", c.userAgent)
-	if c.userID != "" {
-		req.Header.Set("X-User-ID", c.userID)
-	}
-	if c.nodeID != "" {
-		req.Header.Set("X-Node-ID", c.nodeID)
+	if c.jwtToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.jwtToken)
 	}
 
 	// Send request
@@ -214,31 +201,20 @@ func (c *Client) HealthCheck(ctx context.Context) (*HealthResponse, error) {
 	return &response, nil
 }
 
-// SetUserID updates the user ID for subsequent requests
-func (c *Client) SetUserID(userID string) {
-	c.userID = userID
+// SetJWTToken updates the JWT token for subsequent requests
+func (c *Client) SetJWTToken(token string) {
+	c.jwtToken = token
 }
 
-// SetNodeID updates the node ID for subsequent requests
-func (c *Client) SetNodeID(nodeID string) {
-	c.nodeID = nodeID
-}
-
-// GetUserID returns the current user ID
-func (c *Client) GetUserID() string {
-	return c.userID
-}
-
-// GetNodeID returns the current node ID
-func (c *Client) GetNodeID() string {
-	return c.nodeID
+// GetJWTToken returns the current JWT token
+func (c *Client) GetJWTToken() string {
+	return c.jwtToken
 }
 
 // NewSessionEventsClient is a convenience function to create a new session events client
-func NewSessionEventsClient(baseURL string, userID string, nodeID string) *Client {
+func NewSessionEventsClient(baseURL string, jwtToken string) *Client {
 	return NewClient(ClientConfig{
-		BaseURL: baseURL,
-		UserID:  userID,
-		NodeID:  nodeID,
+		BaseURL:  baseURL,
+		JWTToken: jwtToken,
 	})
 }

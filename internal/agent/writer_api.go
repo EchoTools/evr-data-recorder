@@ -35,11 +35,11 @@ type StreamFramePayload struct {
 }
 
 // NewStreamWriter creates a new StreamWriter
-func NewStreamWriter(logger *zap.Logger, httpURL, socketURL, httpKey, serverKey, username, password string) *StreamWriter {
+func NewStreamWriter(logger *zap.Logger, httpURL, socketURL, jwtToken, serverKey string) *StreamWriter {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	frameProcessor := processing.New()
-	streamClient := NewStreamClient(logger, httpURL, socketURL, httpKey, serverKey, username, password)
+	streamClient := NewStreamClient(logger, httpURL, socketURL, jwtToken, serverKey)
 
 	outgoingCh := make(chan *rtapi.LobbySessionStateFrame, 1000) // Buffered channel for outgoing frames
 

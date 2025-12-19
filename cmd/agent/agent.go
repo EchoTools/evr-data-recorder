@@ -13,7 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/echotools/evr-data-recorder/v4/internal/agent"
+	"github.com/echotools/nevr-agent/internal/agent"
+	"github.com/echotools/nevr-agent/internal/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -41,20 +42,18 @@ the HTTP API at the configured frequency, storing output to files.`,
 	cmd.Flags().String("format", "nevrcap", "Output format (nevrcap, replay, stream, or comma-separated)")
 	cmd.Flags().String("output", "output", "Output directory")
 
+	// JWT token for API authentication
+	cmd.Flags().String("token", "", "JWT token for API authentication (stream and events)")
+
 	// Stream options
 	cmd.Flags().Bool("stream", false, "Enable streaming to Nakama server")
 	cmd.Flags().String("stream-http", "https://g.echovrce.com:7350", "Stream HTTP URL")
 	cmd.Flags().String("stream-socket", "wss://g.echovrce.com:7350/ws", "Stream WebSocket URL")
-	cmd.Flags().String("stream-http-key", "", "Stream HTTP key")
 	cmd.Flags().String("stream-server-key", "", "Stream server key")
-	cmd.Flags().String("stream-username", "", "Stream username")
-	cmd.Flags().String("stream-password", "", "Stream password")
 
 	// Events API options
 	cmd.Flags().Bool("events", false, "Enable sending frames to events API")
-	cmd.Flags().String("events-endpoint", "http://localhost:8081", "Base URL of the events API")
-	cmd.Flags().String("events-user-id", "", "Optional user ID header for events API")
-	cmd.Flags().String("events-node-id", "default-node", "Node ID header for events API")
+	cmd.Flags().String("events-url", "http://localhost:8081", "Base URL of the events API")
 
 	// Bind flags to viper
 	viper.BindPFlags(cmd.Flags())
@@ -67,17 +66,18 @@ func runAgent(cmd *cobra.Command, args []string) error {
 	cfg.Agent.Frequency = viper.GetInt("frequency")
 	cfg.Agent.Format = viper.GetString("format")
 	cfg.Agent.OutputDirectory = viper.GetString("output")
+	cfg.Agent.JWTToken = viper.GetString("token")
 	cfg.Agent.StreamEnabled = viper.GetBool("stream")
 	cfg.Agent.StreamHTTPURL = viper.GetString("stream-http")
 	cfg.Agent.StreamSocketURL = viper.GetString("stream-socket")
-	cfg.Agent.StreamHTTPKey = viper.GetString("stream-http-key")
 	cfg.Agent.StreamServerKey = viper.GetString("stream-server-key")
-	cfg.Agent.StreamUsername = viper.GetString("stream-username")
-	cfg.Agent.StreamPassword = viper.GetString("stream-password")
 	cfg.Agent.EventsEnabled = viper.GetBool("events")
 	cfg.Agent.EventsURL = viper.GetString("events-url")
-	cfg.Agent.EventsUserID = viper.GetString("events-user-id")
-	cfg.Agent.EventsNodeID = viper.GetString("events-node-id")
+
+	// Test connectivity to external services at startup
+	if err := testExternalServices(logger, cfg.Agent); err != nil {
+		return fmt.Errorf("external service health check failed: %w", err)
+	}
 
 	// Parse targets from arguments
 	if len(args) == 0 {
@@ -104,8 +104,7 @@ func runAgent(cmd *cobra.Command, args []string) error {
 		zap.String("format", cfg.Agent.Format),
 		zap.String("output_directory", cfg.Agent.OutputDirectory),
 		zap.Bool("events_enabled", cfg.Agent.EventsEnabled),
-		zap.String("events_endpoint", cfg.Agent.EventsURL),
-		zap.String("events_node_id", cfg.Agent.EventsNodeID),
+		zap.String("events_url", cfg.Agent.EventsURL),
 		zap.Any("targets", targets))
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -229,7 +228,7 @@ OuterLoop:
 						switch format {
 						case "stream":
 							rtapiWriter := agent.NewStreamWriter(logger, cfg.Agent.StreamHTTPURL, cfg.Agent.StreamSocketURL,
-								cfg.Agent.StreamHTTPKey, cfg.Agent.StreamServerKey, cfg.Agent.StreamUsername, cfg.Agent.StreamPassword)
+								cfg.Agent.JWTToken, cfg.Agent.StreamServerKey)
 							if err := rtapiWriter.Connect(); err != nil {
 								logger.Error("Failed to connect stream writer", zap.Error(err))
 								continue
@@ -258,7 +257,7 @@ OuterLoop:
 					switch formats[0] {
 					case "stream":
 						rtapiWriter := agent.NewStreamWriter(logger, cfg.Agent.StreamHTTPURL, cfg.Agent.StreamSocketURL,
-							cfg.Agent.StreamHTTPKey, cfg.Agent.StreamServerKey, cfg.Agent.StreamUsername, cfg.Agent.StreamPassword)
+							cfg.Agent.JWTToken, cfg.Agent.StreamServerKey)
 						if err := rtapiWriter.Connect(); err != nil {
 							logger.Error("Failed to connect stream writer", zap.Error(err))
 							continue
@@ -289,7 +288,7 @@ OuterLoop:
 				// If streaming is enabled via flag (and not already in format list), add stream writer
 				if cfg.Agent.StreamEnabled && !hasStreamFormat {
 					streamWriter := agent.NewStreamWriter(logger, cfg.Agent.StreamHTTPURL, cfg.Agent.StreamSocketURL,
-						cfg.Agent.StreamHTTPKey, cfg.Agent.StreamServerKey, cfg.Agent.StreamUsername, cfg.Agent.StreamPassword)
+						cfg.Agent.JWTToken, cfg.Agent.StreamServerKey)
 					if err := streamWriter.Connect(); err != nil {
 						logger.Error("Failed to connect stream writer", zap.Error(err))
 					} else {
@@ -300,7 +299,7 @@ OuterLoop:
 
 				// If events sending is enabled, add EventsAPI writer
 				if cfg.Agent.EventsEnabled {
-					eventsWriter := agent.NewEventsAPIWriter(logger, cfg.Agent.EventsURL, cfg.Agent.EventsUserID, cfg.Agent.EventsNodeID)
+					eventsWriter := agent.NewEventsAPIWriter(logger, cfg.Agent.EventsURL, cfg.Agent.JWTToken)
 					session = agent.NewMultiWriter(logger, session, eventsWriter)
 				}
 
@@ -325,6 +324,90 @@ OuterLoop:
 		session.Close()
 	}
 	logger.Info("Closed sessions")
+}
+
+// testExternalServices performs health checks on configured external services at startup
+// This ensures failures are caught immediately rather than waiting for the first event
+func testExternalServices(logger *zap.Logger, agentCfg config.AgentConfig) error {
+	var errors []string
+
+	// Test Events API connectivity if enabled
+	if agentCfg.EventsEnabled {
+		logger.Info("Testing Events API connectivity", zap.String("url", agentCfg.EventsURL))
+		if err := testEventsAPI(agentCfg.EventsURL); err != nil {
+			errMsg := fmt.Sprintf("Events API health check failed: %v", err)
+			logger.Error(errMsg)
+			errors = append(errors, errMsg)
+		} else {
+			logger.Info("Events API health check passed")
+		}
+	}
+
+	// Test Stream connectivity if enabled
+	if agentCfg.StreamEnabled {
+		logger.Info("Testing Stream server connectivity",
+			zap.String("http_url", agentCfg.StreamHTTPURL),
+			zap.String("socket_url", agentCfg.StreamSocketURL))
+		if err := testStreamConnectivity(agentCfg); err != nil {
+			errMsg := fmt.Sprintf("Stream server health check failed: %v", err)
+			logger.Error(errMsg)
+			errors = append(errors, errMsg)
+		} else {
+			logger.Info("Stream server health check passed")
+		}
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("failed health checks: %v", strings.Join(errors, "; "))
+	}
+
+	return nil
+}
+
+// testEventsAPI checks if the Events API server is reachable and responding
+func testEventsAPI(eventsURL string) error {
+	client := &http.Client{Timeout: 5 * time.Second}
+
+	// Try a simple HEAD or GET request to the base URL to test connectivity
+	resp, err := client.Head(eventsURL)
+	if err != nil {
+		return fmt.Errorf("failed to connect to events API at %s: %w", eventsURL, err)
+	}
+	defer resp.Body.Close()
+
+	// Accept any response - just checking if the server is reachable
+	// 404 is fine, 500+ errors indicate server issues
+	if resp.StatusCode >= 500 {
+		return fmt.Errorf("events API returned error status %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+// testStreamConnectivity tests connection to the Nakama stream server
+func testStreamConnectivity(cfg config.AgentConfig) error {
+	// Create a stream client and attempt to connect
+	logger := logger.With(
+		zap.String("component", "stream_health_check"),
+	)
+
+	streamClient := agent.NewStreamClient(
+		logger,
+		cfg.StreamHTTPURL,
+		cfg.StreamSocketURL,
+		cfg.JWTToken,
+		cfg.StreamServerKey,
+	)
+
+	// Attempt to connect - this includes both HTTP auth and WebSocket connection
+	if err := streamClient.Connect(); err != nil {
+		return fmt.Errorf("failed to connect to stream server: %w", err)
+	}
+
+	// Close the test connection
+	streamClient.Close()
+
+	return nil
 }
 
 func parseHostPort(s string) (string, []int, error) {

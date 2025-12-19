@@ -8,18 +8,46 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/echotools/evr-data-recorder/v4/internal/api"
+	"github.com/echotools/nevr-agent/internal/api"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func main() {
-	// Get MongoDB URI from environment or use default
-	mongoURI := os.Getenv("EVR_APISERVER_MONGO_URI")
+func newMigrateCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "migrate",
+		Short: "Run database schema migrations",
+		Long: `Migrate runs schema migrations on the MongoDB database.
+
+This command connects to MongoDB and applies any pending schema migrations
+to ensure the database structure is up to date.`,
+		Example: `  # Run migration with default MongoDB URI
+  agent migrate
+
+  # Run migration with custom MongoDB URI
+  agent migrate --mongo-uri mongodb://user:pass@localhost:27017/dbname`,
+		RunE: runMigrate,
+	}
+
+	cmd.Flags().String("mongo-uri", "mongodb://localhost:27017", "MongoDB connection URI")
+	viper.BindPFlag("migrate.mongo-uri", cmd.Flags().Lookup("mongo-uri"))
+
+	return cmd
+}
+
+func runMigrate(cmd *cobra.Command, args []string) error {
+	// Get MongoDB URI from flag or environment
+	mongoURI := viper.GetString("migrate.mongo-uri")
+	if mongoURI == "" {
+		mongoURI = os.Getenv("EVR_APISERVER_MONGO_URI")
+	}
 	if mongoURI == "" {
 		mongoURI = "mongodb://localhost:27017"
 	}
 
+	logger.Info("Starting schema migration")
 	fmt.Printf("Connecting to MongoDB: %s\n", mongoURI)
 
 	// Create context with cancellation
@@ -39,8 +67,7 @@ func main() {
 	clientOptions := options.Client().ApplyURI(mongoURI)
 	client, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to connect to MongoDB: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to connect to MongoDB: %w", err)
 	}
 	defer func() {
 		disconnectCtx, disconnectCancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -50,20 +77,18 @@ func main() {
 
 	// Ping MongoDB to verify connection
 	if err := client.Ping(ctx, nil); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to ping MongoDB: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to ping MongoDB: %w", err)
 	}
 	fmt.Println("Connected to MongoDB successfully")
 
 	// Create logger
-	logger := &api.DefaultLogger{}
+	apiLogger := &api.DefaultLogger{}
 
 	// Run migration
 	fmt.Println("Starting schema migration...")
-	stats, err := api.MigrateSchema(ctx, client, logger)
+	stats, err := api.MigrateSchema(ctx, client, apiLogger)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Migration failed: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("migration failed: %w", err)
 	}
 
 	// Print statistics
@@ -76,10 +101,10 @@ func main() {
 
 	// Validate migration
 	fmt.Println("\nValidating migration...")
-	if err := api.ValidateMigration(ctx, client, logger); err != nil {
-		fmt.Fprintf(os.Stderr, "Validation failed: %v\n", err)
-		os.Exit(1)
+	if err := api.ValidateMigration(ctx, client, apiLogger); err != nil {
+		return fmt.Errorf("validation failed: %w", err)
 	}
 
 	fmt.Println("\nMigration completed successfully!")
+	return nil
 }

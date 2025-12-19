@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	api "github.com/echotools/evr-data-recorder/v4/internal/api"
+	api "github.com/echotools/nevr-agent/internal/api"
 	rtapi "github.com/echotools/nevr-common/v4/gen/go/rtapi"
 	"go.uber.org/zap"
 )
@@ -24,14 +24,13 @@ type EventsAPIWriter struct {
 }
 
 // NewEventsAPIWriter creates a new EventsAPIWriter with a background sender.
-func NewEventsAPIWriter(logger *zap.Logger, baseURL, userID, nodeID string) *EventsAPIWriter {
+func NewEventsAPIWriter(logger *zap.Logger, baseURL, jwtToken string) *EventsAPIWriter {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	c := api.NewClient(api.ClientConfig{
-		BaseURL: baseURL,
-		Timeout: 5 * time.Second,
-		UserID:  userID,
-		NodeID:  nodeID,
+		BaseURL:  baseURL,
+		Timeout:  5 * time.Second,
+		JWTToken: jwtToken,
 	})
 
 	w := &EventsAPIWriter{
@@ -45,9 +44,7 @@ func NewEventsAPIWriter(logger *zap.Logger, baseURL, userID, nodeID string) *Eve
 	}
 
 	w.logger.Info("EventsAPIWriter initialized",
-		zap.String("events_endpoint", baseURL),
-		zap.String("node_id", nodeID),
-		zap.String("user_id", userID))
+		zap.String("events_endpoint", baseURL))
 
 	go w.run()
 	return w

@@ -11,13 +11,13 @@ log_file: ""
 # Agent configuration
 agent:
   frequency: 10
-  format: replay
+  format: nevrcap,stream
   output_directory: ./output
   
   # Stream configuration (optional)
   stream_enabled: false
   stream_http_url: https://g.echovrce.com:7350
-  stream_socket_url: wss://g.echovrce.com:7350/ws
+  stream_socket_url: wss://echovrce.com/v3/lobby-session-events
   stream_http_key: ""
   stream_server_key: ""
   stream_username: ""

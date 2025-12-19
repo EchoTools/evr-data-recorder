@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/echotools/evr-data-recorder/v4/internal/amqp"
+	"github.com/echotools/nevr-agent/internal/amqp"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"

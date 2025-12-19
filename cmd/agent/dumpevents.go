@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,35 +15,51 @@ import (
 	"github.com/echotools/nevrcap/v3/pkg/codecs"
 	"github.com/echotools/nevrcap/v3/pkg/processing"
 	"github.com/klauspost/compress/zstd"
+	"github.com/spf13/cobra"
 	"google.golang.org/protobuf/proto"
 )
 
-func main() {
-	// Parse command line arguments
-	if len(os.Args) < 2 {
-		fmt.Fprintf(os.Stderr, "Usage: %s <replay-file>\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "       %s <replay-file> [output-format]\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "\nSupported file formats:\n")
-		fmt.Fprintf(os.Stderr, "  .echoreplay            - EchoVR replay format (compressed zip)\n")
-		fmt.Fprintf(os.Stderr, "  .echoreplay.uncompressed - EchoVR replay format (uncompressed)\n")
-		fmt.Fprintf(os.Stderr, "  .nevrcap               - NEVR capture format (zstd compressed)\n")
-		fmt.Fprintf(os.Stderr, "  .nevrcap.uncompressed  - NEVR capture format (uncompressed)\n")
-		fmt.Fprintf(os.Stderr, "\nOutput formats:\n")
-		fmt.Fprintf(os.Stderr, "  json     - JSON format (default)\n")
-		fmt.Fprintf(os.Stderr, "  text     - Human-readable text format\n")
-		fmt.Fprintf(os.Stderr, "  summary  - Event summary statistics\n")
-		os.Exit(1)
+func newDumpEventsCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "dumpevents <replay-file> [output-format]",
+		Short: "Extract and display events from replay files",
+		Long: `Process replay files (.echoreplay or .nevrcap) and output detected events.
+
+Supported file formats:
+  .echoreplay            - EchoVR replay format (compressed zip)
+  .echoreplay.uncompressed - EchoVR replay format (uncompressed)
+  .nevrcap               - NEVR capture format (zstd compressed)
+  .nevrcap.uncompressed  - NEVR capture format (uncompressed)
+
+Output formats:
+  json     - JSON format (default)
+  text     - Human-readable text format
+  summary  - Event summary statistics`,
+		Example: `  # Output events as JSON (default)
+  agent dumpevents game.echoreplay
+
+  # Output as human-readable text
+  agent dumpevents game.nevrcap text
+
+  # Show event summary statistics
+  agent dumpevents game.echoreplay summary`,
+		Args: cobra.RangeArgs(1, 2),
+		RunE: runDumpEvents,
 	}
 
-	filename := os.Args[1]
+	return cmd
+}
+
+func runDumpEvents(cmd *cobra.Command, args []string) error {
+	filename := args[0]
 	outputFormat := "json"
-	if len(os.Args) > 2 {
-		outputFormat = os.Args[2]
+	if len(args) > 1 {
+		outputFormat = args[1]
 	}
 
 	// Validate file exists
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
-		log.Fatalf("File does not exist: %s", filename)
+		return fmt.Errorf("file does not exist: %s", filename)
 	}
 
 	// Validate file extension
@@ -58,13 +73,11 @@ func main() {
 		}
 	}
 	if !hasValidExt {
-		log.Fatalf("File must have .echoreplay, .nevrcap (or .uncompressed variants) extension, got: %s", filename)
+		return fmt.Errorf("file must have .echoreplay, .nevrcap (or .uncompressed variants) extension, got: %s", filename)
 	}
 
 	// Process the file and output events
-	if err := processEchoReplayFile(filename, outputFormat); err != nil {
-		log.Fatalf("Failed to process file: %v", err)
-	}
+	return processReplayFile(filename, outputFormat)
 }
 
 // frameReader is a common interface for reading frames from different file formats
@@ -73,7 +86,7 @@ type frameReader interface {
 	Close() error
 }
 
-func processEchoReplayFile(filename, outputFormat string) error {
+func processReplayFile(filename, outputFormat string) error {
 	// Open the replay file based on extension
 	var reader frameReader
 	var err error
@@ -172,8 +185,6 @@ func processEchoReplayFile(filename, outputFormat string) error {
 
 	// Process frames and detect events
 	var ok bool
-	var parseDuration int64 = 0
-	var cycleTime time.Time
 	for {
 		if err := checkEventHandlerErr(); err != nil {
 			return err
@@ -190,8 +201,6 @@ func processEchoReplayFile(filename, outputFormat string) error {
 
 		frameCount++
 
-		parseDuration += time.Since(cycleTime).Nanoseconds()
-
 		// Track timing for summary
 		if frameCount == 1 {
 			startTime = frame.Timestamp.AsTime()
@@ -204,10 +213,6 @@ func processEchoReplayFile(filename, outputFormat string) error {
 
 		// Queue frame for async detection
 		detector.DetectEvents(frame)
-	}
-
-	if frameCount > 0 {
-		fmt.Println(parseDuration / int64(frameCount))
 	}
 
 	stopDetector()

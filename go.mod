@@ -1,4 +1,4 @@
-module github.com/echotools/evr-data-recorder/v4
+module github.com/echotools/nevr-agent/v4
 
 go 1.25.0
 

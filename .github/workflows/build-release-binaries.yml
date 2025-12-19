@@ -50,9 +50,9 @@ jobs:
           fi
           
           # Build the consolidated binary
-          OUTPUT_NAME="evrtelemetry_${VERSION}_${GOOS}_${GOARCH}${EXT}"
+          OUTPUT_NAME="agent_${VERSION}_${GOOS}_${GOARCH}${EXT}"
           echo "Building $OUTPUT_NAME"
-          GOOS=$GOOS GOARCH=$GOARCH go build -ldflags "$LDFLAGS" -o "$OUTPUT_NAME" ./cmd/evrtelemetry
+          GOOS=$GOOS GOARCH=$GOARCH go build -ldflags "$LDFLAGS" -o "$OUTPUT_NAME" ./cmd/agent
 
       - name: List built files
         run: ls -lah *_${{ steps.version.outputs.VERSION }}_${{ matrix.goos }}_${{ matrix.goarch }}*

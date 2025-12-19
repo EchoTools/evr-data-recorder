@@ -18,7 +18,7 @@ resolver:
   filename_template: "{name}.resolvers.go"
 
 autobind:
-  - github.com/echotools/evr-data-recorder/v4/internal/api/graph/model
+  - github.com/echotools/nevr-agent/internal/api/graph/model
 
 models:
   ID:

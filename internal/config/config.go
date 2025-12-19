@@ -34,25 +34,22 @@ type Config struct {
 
 // AgentConfig holds configuration for the agent subcommand
 type AgentConfig struct {
-	Frequency       int               `yaml:"frequency" mapstructure:"frequency"`
-	Format          string            `yaml:"format" mapstructure:"format"`
-	OutputDirectory string            `yaml:"output_directory" mapstructure:"output_directory"`
-	Targets         map[string]string `yaml:"targets" mapstructure:"targets"`
+	Frequency       int    `yaml:"frequency" mapstructure:"frequency"`
+	Format          string `yaml:"format" mapstructure:"format"`
+	OutputDirectory string `yaml:"output_directory" mapstructure:"output_directory"`
+
+	// JWT token for API authentication (used for both stream and events APIs)
+	JWTToken string `yaml:"jwt_token" mapstructure:"jwt_token"`
 
 	// Stream configuration
 	StreamEnabled   bool   `yaml:"stream_enabled" mapstructure:"stream_enabled"`
 	StreamHTTPURL   string `yaml:"stream_http_url" mapstructure:"stream_http_url"`
 	StreamSocketURL string `yaml:"stream_socket_url" mapstructure:"stream_socket_url"`
-	StreamHTTPKey   string `yaml:"stream_http_key" mapstructure:"stream_http_key"`
 	StreamServerKey string `yaml:"stream_server_key" mapstructure:"stream_server_key"`
-	StreamUsername  string `yaml:"stream_username" mapstructure:"stream_username"`
-	StreamPassword  string `yaml:"stream_password" mapstructure:"stream_password"`
 
 	// Events API configuration
 	EventsEnabled bool   `yaml:"events_enabled" mapstructure:"events_enabled"`
 	EventsURL     string `yaml:"events_url" mapstructure:"events_url"`
-	EventsUserID  string `yaml:"events_user_id" mapstructure:"events_user_id"`
-	EventsNodeID  string `yaml:"events_node_id" mapstructure:"events_node_id"`
 }
 
 // APIServerConfig holds configuration for the API server subcommand
@@ -90,10 +87,8 @@ func DefaultConfig() *Config {
 			OutputDirectory: "output",
 			StreamHTTPURL:   "https://g.echovrce.com:7350",
 			StreamSocketURL: "wss://g.echovrce.com:7350/ws",
-			StreamHTTPKey:   "",
 			StreamServerKey: "",
 			EventsURL:       "http://localhost:8081",
-			EventsNodeID:    "default-node",
 		},
 		APIServer: APIServerConfig{
 			ServerAddress: ":8081",
@@ -133,7 +128,7 @@ func LoadConfig(configFile string) (*Config, error) {
 	}
 
 	// Set up environment variable support
-	v.SetEnvPrefix("EVR")
+	v.SetEnvPrefix("NEVR")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
 	v.AutomaticEnv()
 
