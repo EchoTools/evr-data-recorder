@@ -15,13 +15,12 @@ func main() {
 	// Create configuration
 	config := api.DefaultConfig()
 
-	// Override with environment variables if set
-	if mongoURI := os.Getenv("MONGO_URI"); mongoURI != "" {
-		config.MongoURI = mongoURI
-	}
-	if serverAddr := os.Getenv("SERVER_ADDRESS"); serverAddr != "" {
-		config.ServerAddress = serverAddr
-	}
+	// Configuration is now read from environment variables with EVR_APISERVER_ prefix:
+	// EVR_APISERVER_MONGO_URI - MongoDB connection URI
+	// EVR_APISERVER_SERVER_ADDRESS - Server bind address
+	// EVR_APISERVER_AMQP_URI - AMQP connection URI
+	// EVR_APISERVER_AMQP_ENABLED - Enable AMQP publishing
+	// EVR_APISERVER_CORS_ORIGINS - Allowed CORS origins (comma-separated)
 
 	// Create service
 	service, err := api.NewService(config, nil)

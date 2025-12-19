@@ -15,7 +15,7 @@ import (
 
 func main() {
 	// Get MongoDB URI from environment or use default
-	mongoURI := os.Getenv("MONGO_URI")
+	mongoURI := os.Getenv("EVR_APISERVER_MONGO_URI")
 	if mongoURI == "" {
 		mongoURI = "mongodb://localhost:27017"
 	}

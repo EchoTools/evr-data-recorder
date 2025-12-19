@@ -34,19 +34,29 @@ type Config struct {
 
 // DefaultConfig returns a default configuration
 func DefaultConfig() *Config {
-	// Check for environment variables
-	amqpURI := os.Getenv("AMQP_URI")
+	// Check for environment variables with EVR_APISERVER_ prefix
+	amqpURI := os.Getenv("EVR_APISERVER_AMQP_URI")
 	if amqpURI == "" {
 		amqpURI = "amqp://guest:guest@localhost:5672/"
 	}
 
-	amqpEnabled := os.Getenv("AMQP_ENABLED") == "true"
+	amqpEnabled := os.Getenv("EVR_APISERVER_AMQP_ENABLED") == "true"
+
+	mongoURI := os.Getenv("EVR_APISERVER_MONGO_URI")
+	if mongoURI == "" {
+		mongoURI = "mongodb://localhost:27017"
+	}
+
+	serverAddress := os.Getenv("EVR_APISERVER_SERVER_ADDRESS")
+	if serverAddress == "" {
+		serverAddress = ":8080"
+	}
 
 	return &Config{
-		MongoURI:       "mongodb://localhost:27017",
+		MongoURI:       mongoURI,
 		DatabaseName:   sessionEventDatabaseName,
 		CollectionName: sessionEventCollectionName,
-		ServerAddress:  ":8080",
+		ServerAddress:  serverAddress,
 		AMQPURI:        amqpURI,
 		AMQPQueueName:  amqp.DefaultQueueName,
 		AMQPEnabled:    amqpEnabled,
