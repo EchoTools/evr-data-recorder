@@ -11,7 +11,7 @@ import (
 
 	"github.com/echotools/nevr-agent/v4/internal/amqp"
 	"github.com/echotools/nevr-agent/v4/internal/api/graph"
-	"github.com/echotools/nevr-common/v4/gen/go/rtapi"
+	"github.com/echotools/nevr-common/v4/gen/go/telemetry/v1"
 	"github.com/gofrs/uuid/v5"
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
@@ -195,7 +195,7 @@ func (s *Server) storeSessionEventHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	// Parse the payload as LobbySessionStateFrame
-	msg := &rtapi.LobbySessionStateFrame{}
+	msg := &telemetry.LobbySessionStateFrame{}
 	if err := protojson.Unmarshal(payload, msg); err != nil {
 		s.logger.Error("Failed to unmarshal protobuf payload", "error", err)
 		http.Error(w, "Invalid protobuf payload", http.StatusBadRequest)

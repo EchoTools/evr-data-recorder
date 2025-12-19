@@ -6,7 +6,7 @@ import (
 	"time"
 
 	api "github.com/echotools/nevr-agent/v4/internal/api"
-	rtapi "github.com/echotools/nevr-common/v4/gen/go/rtapi"
+	"github.com/echotools/nevr-common/v4/gen/go/telemetry/v1"
 	"go.uber.org/zap"
 )
 
@@ -16,7 +16,7 @@ type EventsAPIWriter struct {
 	client      *api.Client
 	ctx         context.Context
 	cancel      context.CancelFunc
-	outgoingCh  chan *rtapi.LobbySessionStateFrame
+	outgoingCh  chan *telemetry.LobbySessionStateFrame
 	stopped     bool
 	framesCount int64
 	eventsSent  int64
@@ -38,7 +38,7 @@ func NewEventsAPIWriter(logger *zap.Logger, baseURL, jwtToken string) *EventsAPI
 		client:     c,
 		ctx:        ctx,
 		cancel:     cancel,
-		outgoingCh: make(chan *rtapi.LobbySessionStateFrame, 1000),
+		outgoingCh: make(chan *telemetry.LobbySessionStateFrame, 1000),
 		stopped:    false,
 		eventsURL:  baseURL,
 	}
@@ -80,7 +80,7 @@ func (w *EventsAPIWriter) run() {
 func (w *EventsAPIWriter) Context() context.Context { return w.ctx }
 
 // WriteFrame enqueues a frame for sending to the events API.
-func (w *EventsAPIWriter) WriteFrame(frame *rtapi.LobbySessionStateFrame) error {
+func (w *EventsAPIWriter) WriteFrame(frame *telemetry.LobbySessionStateFrame) error {
 	if w.stopped {
 		return fmt.Errorf("events api writer is stopped")
 	}

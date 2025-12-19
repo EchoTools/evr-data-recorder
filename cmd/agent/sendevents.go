@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/echotools/nevr-agent/v4/internal/api"
-	"github.com/echotools/nevr-common/v4/gen/go/rtapi"
+	"github.com/echotools/nevr-common/v4/gen/go/telemetry/v1"
 	"github.com/echotools/nevrcap/v3/pkg/codecs"
 	"github.com/echotools/nevrcap/v3/pkg/events"
 	"github.com/echotools/nevrcap/v3/pkg/processing"
@@ -174,7 +174,7 @@ func processSendEvents(filename string, client *api.Client, rate float64, dryRun
 			<-ticker.C
 		}
 
-		frame := &rtapi.LobbySessionStateFrame{}
+		frame := &telemetry.LobbySessionStateFrame{}
 		ok, err := reader.ReadFrameTo(frame)
 		if err != nil {
 			if err == io.EOF {

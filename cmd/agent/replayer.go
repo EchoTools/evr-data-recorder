@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/echotools/nevr-common/v4/gen/go/apigame"
-	"github.com/echotools/nevr-common/v4/gen/go/rtapi"
+	"github.com/echotools/nevr-common/v4/gen/go/telemetry/v1"
 	"github.com/echotools/nevrcap/v3/pkg/codecs"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -32,7 +32,7 @@ type ReplayServer struct {
 	bindAddr string
 
 	mu           sync.RWMutex
-	currentFrame *rtapi.LobbySessionStateFrame
+	currentFrame *telemetry.LobbySessionStateFrame
 	isPlaying    bool
 	frameCount   int64
 	startTime    time.Time
@@ -377,7 +377,7 @@ func (rs *ReplayServer) handlePlayerBones(w http.ResponseWriter, r *http.Request
 	encoder.Encode(boneData)
 }
 
-func (rs *ReplayServer) buildFrameResponse(frame *rtapi.LobbySessionStateFrame, frameCount int64, startTime time.Time) (*FrameResponse, error) {
+func (rs *ReplayServer) buildFrameResponse(frame *telemetry.LobbySessionStateFrame, frameCount int64, startTime time.Time) (*FrameResponse, error) {
 	timestamp := ""
 	if frame.GetTimestamp() != nil {
 		timestamp = frame.GetTimestamp().AsTime().Format(time.RFC3339Nano)

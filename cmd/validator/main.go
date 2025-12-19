@@ -18,7 +18,7 @@ import (
 	"reflect"
 
 	"github.com/echotools/nevr-common/v4/gen/go/apigame"
-	"github.com/echotools/nevr-common/v4/gen/go/rtapi"
+	"github.com/echotools/nevr-common/v4/gen/go/telemetry/v1"
 	"github.com/echotools/nevrcap/v3/pkg/codecs"
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -133,7 +133,7 @@ func validateEchoReplayFile(filename string) error {
 		}
 
 		// Step 2: Parse JSON into protobuf and re-encode
-		var frame *rtapi.LobbySessionStateFrame
+		var frame *telemetry.LobbySessionStateFrame
 		if codec != nil {
 			// Use codec for zip files
 			frame, err = codec.ReadFrame()
@@ -246,14 +246,14 @@ func manuallyParseLine(line []byte) (session map[string]any, bones map[string]an
 }
 
 // parseLineToFrame parses a line directly into a LobbySessionStateFrame
-func parseLineToFrame(line []byte, unmarshaler *protojson.UnmarshalOptions) (*rtapi.LobbySessionStateFrame, error) {
+func parseLineToFrame(line []byte, unmarshaler *protojson.UnmarshalOptions) (*telemetry.LobbySessionStateFrame, error) {
 	// Format: timestamp\tsession_json\t user_bones_json
 	parts := bytes.Split(line, []byte("\t"))
 	if len(parts) < 2 {
 		return nil, fmt.Errorf("invalid line format: expected at least 2 tab-separated parts")
 	}
 
-	frame := &rtapi.LobbySessionStateFrame{
+	frame := &telemetry.LobbySessionStateFrame{
 		Session: &apigame.SessionResponse{},
 	}
 
@@ -281,7 +281,7 @@ func parseLineToFrame(line []byte, unmarshaler *protojson.UnmarshalOptions) (*rt
 }
 
 // reEncodeFrameWithProtobuf takes a decoded frame and re-encodes it using the same marshaler settings as the codec
-func reEncodeWithCodec(frame *rtapi.LobbySessionStateFrame) (session map[string]any, bones map[string]any, err error) {
+func reEncodeWithCodec(frame *telemetry.LobbySessionStateFrame) (session map[string]any, bones map[string]any, err error) {
 	if frame == nil {
 		return nil, nil, fmt.Errorf("nil frame")
 	}
@@ -322,7 +322,7 @@ func reEncodeWithCodec(frame *rtapi.LobbySessionStateFrame) (session map[string]
 	return session, bones, nil
 }
 
-func reEncodeTheFrameWithJsonPackage(frame *rtapi.LobbySessionStateFrame) (session map[string]any, bones map[string]any, err error) {
+func reEncodeTheFrameWithJsonPackage(frame *telemetry.LobbySessionStateFrame) (session map[string]any, bones map[string]any, err error) {
 	if frame == nil {
 		return nil, nil, fmt.Errorf("nil frame")
 	}

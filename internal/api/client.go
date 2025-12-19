@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/echotools/nevr-common/v4/gen/go/rtapi"
+	"github.com/echotools/nevr-common/v4/gen/go/telemetry/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -57,9 +57,9 @@ type StoreSessionEventResponse struct {
 
 // GetSessionEventsResponse represents the response from retrieving session events
 type GetSessionEventsResponse struct {
-	LobbySessionUUID string                          `json:"lobby_session_id"`
-	Count            int                             `json:"count"`
-	Events           []*rtapi.LobbySessionStateFrame `json:"events"`
+	LobbySessionUUID string                              `json:"lobby_session_id"`
+	Count            int                                 `json:"count"`
+	Events           []*telemetry.LobbySessionStateFrame `json:"events"`
 }
 
 // HealthResponse represents the health check response
@@ -69,7 +69,7 @@ type HealthResponse struct {
 }
 
 // StoreSessionEvent stores a session event to the server
-func (c *Client) StoreSessionEvent(ctx context.Context, event *rtapi.LobbySessionStateFrame) (*StoreSessionEventResponse, error) {
+func (c *Client) StoreSessionEvent(ctx context.Context, event *telemetry.LobbySessionStateFrame) (*StoreSessionEventResponse, error) {
 	// Convert protobuf to JSON
 	jsonData, err := protojson.Marshal(event)
 	if err != nil {

@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/echotools/nevr-common/v4/gen/go/rtapi"
+	"github.com/echotools/nevr-common/v4/gen/go/telemetry/v1"
 	"github.com/echotools/nevrcap/v3/pkg/codecs"
 	"github.com/echotools/nevrcap/v3/pkg/processing"
 	"github.com/klauspost/compress/zstd"
@@ -82,7 +82,7 @@ func runDumpEvents(cmd *cobra.Command, args []string) error {
 
 // frameReader is a common interface for reading frames from different file formats
 type frameReader interface {
-	ReadFrameTo(frame *rtapi.LobbySessionStateFrame) (bool, error)
+	ReadFrameTo(frame *telemetry.LobbySessionStateFrame) (bool, error)
 	Close() error
 }
 
@@ -120,13 +120,13 @@ func processReplayFile(filename, outputFormat string) error {
 
 	var (
 		frameMu         sync.RWMutex
-		currentFrame    *rtapi.LobbySessionStateFrame
+		currentFrame    *telemetry.LobbySessionStateFrame
 		eventsWG        sync.WaitGroup
 		eventErrChan    = make(chan error, 1)
 		eventHandlerErr error
 	)
 
-	handleEvent := func(event *rtapi.LobbySessionEvent, frame *rtapi.LobbySessionStateFrame) error {
+	handleEvent := func(event *telemetry.LobbySessionEvent, frame *telemetry.LobbySessionStateFrame) error {
 		switch outputFormat {
 		case "json":
 			return outputEventJSON(event, frame)
@@ -190,7 +190,7 @@ func processReplayFile(filename, outputFormat string) error {
 			return err
 		}
 
-		frame := &rtapi.LobbySessionStateFrame{}
+		frame := &telemetry.LobbySessionStateFrame{}
 		ok, err = reader.ReadFrameTo(frame)
 		if err != nil || !ok {
 			if err == io.EOF {
@@ -229,7 +229,7 @@ func processReplayFile(filename, outputFormat string) error {
 	return nil
 }
 
-func outputEventJSON(event *rtapi.LobbySessionEvent, frame *rtapi.LobbySessionStateFrame) error {
+func outputEventJSON(event *telemetry.LobbySessionEvent, frame *telemetry.LobbySessionStateFrame) error {
 	// Create a structured output with event and frame context
 	output := map[string]any{
 		"event_type": getEventTypeName(event),
@@ -251,7 +251,7 @@ func outputEventJSON(event *rtapi.LobbySessionEvent, frame *rtapi.LobbySessionSt
 	return encoder.Encode(output)
 }
 
-func outputEventText(event *rtapi.LobbySessionEvent, frame *rtapi.LobbySessionStateFrame) {
+func outputEventText(event *telemetry.LobbySessionEvent, frame *telemetry.LobbySessionStateFrame) {
 	timestamp := "unknown"
 	frameLabel := "unknown"
 	if frame != nil {
@@ -264,32 +264,32 @@ func outputEventText(event *rtapi.LobbySessionEvent, frame *rtapi.LobbySessionSt
 
 	// Add specific event details
 	switch payload := event.Event.(type) {
-	case *rtapi.LobbySessionEvent_PlayerJoined:
+	case *telemetry.LobbySessionEvent_PlayerJoined:
 		fmt.Printf(" - Player: %s (Slot %d)",
 			payload.PlayerJoined.Player.DisplayName,
 			payload.PlayerJoined.Player.SlotNumber)
-	case *rtapi.LobbySessionEvent_PlayerLeft:
+	case *telemetry.LobbySessionEvent_PlayerLeft:
 		fmt.Printf(" - Player: %s (Slot %d)",
 			payload.PlayerLeft.DisplayName,
 			payload.PlayerLeft.PlayerSlot)
-	case *rtapi.LobbySessionEvent_GoalScored:
+	case *telemetry.LobbySessionEvent_GoalScored:
 		if payload.GoalScored.ScoreDetails != nil {
 			fmt.Printf(" - Goal by player %s",
 				payload.GoalScored.ScoreDetails.PersonScored)
 		}
-	case *rtapi.LobbySessionEvent_RoundStarted:
+	case *telemetry.LobbySessionEvent_RoundStarted:
 		fmt.Printf(" - Round started")
-	case *rtapi.LobbySessionEvent_RoundEnded:
+	case *telemetry.LobbySessionEvent_RoundEnded:
 		fmt.Printf(" - Round ended, Winner: %s",
 			payload.RoundEnded.WinningTeam.String())
-	case *rtapi.LobbySessionEvent_MatchEnded:
+	case *telemetry.LobbySessionEvent_MatchEnded:
 		fmt.Printf(" - Match ended, Winner: %s",
 			payload.MatchEnded.WinningTeam.String())
-	case *rtapi.LobbySessionEvent_ScoreboardUpdated:
+	case *telemetry.LobbySessionEvent_ScoreboardUpdated:
 		fmt.Printf(" - Score: Blue %d-%d Orange",
 			payload.ScoreboardUpdated.BluePoints,
 			payload.ScoreboardUpdated.OrangePoints)
-	case *rtapi.LobbySessionEvent_DiscPossessionChanged:
+	case *telemetry.LobbySessionEvent_DiscPossessionChanged:
 		if payload.DiscPossessionChanged.PlayerSlot == -1 {
 			fmt.Printf(" - Disc is free")
 		} else {
@@ -306,7 +306,7 @@ func outputEventText(event *rtapi.LobbySessionEvent, frame *rtapi.LobbySessionSt
 	fmt.Println()
 }
 
-func updateEventStats(event *rtapi.LobbySessionEvent, stats map[string]int) {
+func updateEventStats(event *telemetry.LobbySessionEvent, stats map[string]int) {
 	eventType := getEventTypeName(event)
 	stats[eventType]++
 }
@@ -344,51 +344,51 @@ func outputSummary(stats map[string]int, frameCount int, startTime, endTime time
 	}
 }
 
-func getEventTypeName(event *rtapi.LobbySessionEvent) string {
+func getEventTypeName(event *telemetry.LobbySessionEvent) string {
 	switch event.Event.(type) {
-	case *rtapi.LobbySessionEvent_RoundStarted:
+	case *telemetry.LobbySessionEvent_RoundStarted:
 		return "RoundStarted"
-	case *rtapi.LobbySessionEvent_RoundPaused:
+	case *telemetry.LobbySessionEvent_RoundPaused:
 		return "RoundPaused"
-	case *rtapi.LobbySessionEvent_RoundUnpaused:
+	case *telemetry.LobbySessionEvent_RoundUnpaused:
 		return "RoundUnpaused"
-	case *rtapi.LobbySessionEvent_RoundEnded:
+	case *telemetry.LobbySessionEvent_RoundEnded:
 		return "RoundEnded"
-	case *rtapi.LobbySessionEvent_MatchEnded:
+	case *telemetry.LobbySessionEvent_MatchEnded:
 		return "MatchEnded"
-	case *rtapi.LobbySessionEvent_ScoreboardUpdated:
+	case *telemetry.LobbySessionEvent_ScoreboardUpdated:
 		return "ScoreboardUpdated"
-	case *rtapi.LobbySessionEvent_PlayerJoined:
+	case *telemetry.LobbySessionEvent_PlayerJoined:
 		return "PlayerJoined"
-	case *rtapi.LobbySessionEvent_PlayerLeft:
+	case *telemetry.LobbySessionEvent_PlayerLeft:
 		return "PlayerLeft"
-	case *rtapi.LobbySessionEvent_PlayerSwitchedTeam:
+	case *telemetry.LobbySessionEvent_PlayerSwitchedTeam:
 		return "PlayerSwitchedTeam"
-	case *rtapi.LobbySessionEvent_EmotePlayed:
+	case *telemetry.LobbySessionEvent_EmotePlayed:
 		return "EmotePlayed"
-	case *rtapi.LobbySessionEvent_DiscPossessionChanged:
+	case *telemetry.LobbySessionEvent_DiscPossessionChanged:
 		return "DiscPossessionChanged"
-	case *rtapi.LobbySessionEvent_DiscThrown:
+	case *telemetry.LobbySessionEvent_DiscThrown:
 		return "DiscThrown"
-	case *rtapi.LobbySessionEvent_DiscCaught:
+	case *telemetry.LobbySessionEvent_DiscCaught:
 		return "DiscCaught"
-	case *rtapi.LobbySessionEvent_GoalScored:
+	case *telemetry.LobbySessionEvent_GoalScored:
 		return "GoalScored"
-	case *rtapi.LobbySessionEvent_PlayerSave:
+	case *telemetry.LobbySessionEvent_PlayerSave:
 		return "PlayerSave"
-	case *rtapi.LobbySessionEvent_PlayerStun:
+	case *telemetry.LobbySessionEvent_PlayerStun:
 		return "PlayerStun"
-	case *rtapi.LobbySessionEvent_PlayerPass:
+	case *telemetry.LobbySessionEvent_PlayerPass:
 		return "PlayerPass"
-	case *rtapi.LobbySessionEvent_PlayerSteal:
+	case *telemetry.LobbySessionEvent_PlayerSteal:
 		return "PlayerSteal"
-	case *rtapi.LobbySessionEvent_PlayerBlock:
+	case *telemetry.LobbySessionEvent_PlayerBlock:
 		return "PlayerBlock"
-	case *rtapi.LobbySessionEvent_PlayerInterception:
+	case *telemetry.LobbySessionEvent_PlayerInterception:
 		return "PlayerInterception"
-	case *rtapi.LobbySessionEvent_PlayerAssist:
+	case *telemetry.LobbySessionEvent_PlayerAssist:
 		return "PlayerAssist"
-	case *rtapi.LobbySessionEvent_PlayerShotTaken:
+	case *telemetry.LobbySessionEvent_PlayerShotTaken:
 		return "PlayerShotTaken"
 	default:
 		return "Unknown"
@@ -414,7 +414,7 @@ func newUncompressedEchoReplayReader(filename string) (*uncompressedEchoReplayRe
 	}, nil
 }
 
-func (r *uncompressedEchoReplayReader) ReadFrameTo(frame *rtapi.LobbySessionStateFrame) (bool, error) {
+func (r *uncompressedEchoReplayReader) ReadFrameTo(frame *telemetry.LobbySessionStateFrame) (bool, error) {
 	// EchoReplay format is tab-separated: timestamp\tsession_json\t player_bones_json
 	// This is a simplified parser - for full support would need to reuse codec parsing
 	if !r.scanner.Scan() {
@@ -483,7 +483,7 @@ func newUncompressedNevrCapReader(filename string) (*uncompressedNevrCapReader, 
 	}, nil
 }
 
-func (r *uncompressedNevrCapReader) ReadFrameTo(frame *rtapi.LobbySessionStateFrame) (bool, error) {
+func (r *uncompressedNevrCapReader) ReadFrameTo(frame *telemetry.LobbySessionStateFrame) (bool, error) {
 	// Read varint length
 	var length uint64
 	var shift uint

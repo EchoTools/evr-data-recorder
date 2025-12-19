@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	rtapi "github.com/echotools/nevr-common/v4/gen/go/rtapi"
+	"github.com/echotools/nevr-common/v4/gen/go/telemetry/v1"
 	"github.com/echotools/nevrcap/v3/pkg/codecs"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -20,7 +20,7 @@ type NevrCapLogSession struct {
 	logger      *zap.Logger
 
 	filePath   string
-	outgoingCh chan *rtapi.LobbySessionStateFrame
+	outgoingCh chan *telemetry.LobbySessionStateFrame
 
 	sessionID string
 	stopped   bool
@@ -39,7 +39,7 @@ func NewNevrCapLogSession(ctx context.Context, logger *zap.Logger, filePath stri
 		logger:      logger,
 
 		filePath:   filePath,
-		outgoingCh: make(chan *rtapi.LobbySessionStateFrame, 1000),
+		outgoingCh: make(chan *telemetry.LobbySessionStateFrame, 1000),
 		sessionID:  sessionID,
 	}
 }
@@ -58,7 +58,7 @@ func (n *NevrCapLogSession) ProcessFrames() error {
 	}()
 
 	// Write header
-	header := &rtapi.TelemetryHeader{
+	header := &telemetry.TelemetryHeader{
 		CaptureId: n.sessionID,
 		CreatedAt: timestamppb.Now(),
 		Metadata: map[string]string{
@@ -126,7 +126,7 @@ OuterLoop:
 	return nil
 }
 
-func (n *NevrCapLogSession) WriteFrame(frame *rtapi.LobbySessionStateFrame) error {
+func (n *NevrCapLogSession) WriteFrame(frame *telemetry.LobbySessionStateFrame) error {
 	if n.IsStopped() {
 		return fmt.Errorf("frame writer is stopped")
 	}
