@@ -112,7 +112,8 @@ func LoadConfig(configFile string) (*Config, error) {
 
 	config := DefaultConfig()
 
-	// Set up viper
+	// Set up viper for config file and environment variables
+	// Use a local viper instance to avoid conflicts with flag bindings
 	v := viper.New()
 	v.SetConfigType("yaml")
 
@@ -132,7 +133,7 @@ func LoadConfig(configFile string) (*Config, error) {
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
 	v.AutomaticEnv()
 
-	// Unmarshal config
+	// Unmarshal config from file and environment variables
 	if err := v.Unmarshal(config); err != nil {
 		return nil, fmt.Errorf("error unmarshaling config: %w", err)
 	}

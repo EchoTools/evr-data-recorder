@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/echotools/nevrcap/v3/pkg/events"
 	"github.com/echotools/nevrcap/v3/pkg/processing"
 	"go.uber.org/zap"
 )
@@ -33,7 +34,7 @@ func NewHTTPFramePoller(ctx context.Context, logger *zap.Logger, client *http.Cl
 		wg                sync.WaitGroup
 		sessionURL        = EndpointSession(baseURL)
 		playerBonesURL    = EndpointPlayerBones(baseURL)
-		processor         = processing.New()
+		processor         = processing.NewWithDetector(events.New(events.WithSynchronousProcessing()))
 		sessionBuffer     = bytes.NewBuffer(make([]byte, 0, 64*1024)) // 64KB buffer
 		playerBonesBuffer = bytes.NewBuffer(make([]byte, 0, 64*1024)) // 64KB buffer
 	)
@@ -115,10 +116,23 @@ func NewHTTPFramePoller(ctx context.Context, logger *zap.Logger, client *http.Cl
 		default:
 		}
 
+		// Skip processing if no session data was received
+		if sessionBuffer.Len() == 0 {
+			continue
+		}
+
 		frame, err := processor.ProcessAndDetectEvents(sessionBuffer.Bytes(), playerBonesBuffer.Bytes(), time.Now().Add(time.Millisecond))
 		if err != nil {
-			logger.Error("Failed to process frame", zap.Error(err))
+			logger.Debug("Failed to process frame", zap.Error(err))
 			continue
+		}
+
+		// Collect any events detected synchronously and attach them to the frame
+		select {
+		case detectedEvents := <-processor.EventsChan():
+			frame.Events = append(frame.Events, detectedEvents...)
+		default:
+			// No events detected
 		}
 
 		// Write the data to the FrameWriter

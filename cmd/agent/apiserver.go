@@ -55,16 +55,21 @@ for storing and retrieving session event data.`,
 	cmd.Flags().String("server-address", ":8081", "Server listen address")
 	cmd.Flags().String("mongo-uri", "mongodb://localhost:27017", "MongoDB connection URI")
 
-	// Bind flags to viper
-	viper.BindPFlags(cmd.Flags())
+	// Bind flags to viper with proper namespacing
+	viper.BindPFlag("apiserver.server_address", cmd.Flags().Lookup("server-address"))
+	viper.BindPFlag("apiserver.mongo_uri", cmd.Flags().Lookup("mongo-uri"))
 
 	return cmd
 }
 
 func runAPIServer(cmd *cobra.Command, args []string) error {
-	// Override config with command flags
-	cfg.APIServer.ServerAddress = viper.GetString("server-address")
-	cfg.APIServer.MongoURI = viper.GetString("mongo-uri")
+	// Override config with command flags (only if explicitly set)
+	if cmd.Flags().Changed("server-address") {
+		cfg.APIServer.ServerAddress = viper.GetString("apiserver.server_address")
+	}
+	if cmd.Flags().Changed("mongo-uri") {
+		cfg.APIServer.MongoURI = viper.GetString("apiserver.mongo_uri")
+	}
 
 	// Validate configuration
 	if err := cfg.ValidateAPIServerConfig(); err != nil {

@@ -74,6 +74,7 @@ serving recorded data.`,
 	rootCmd.AddCommand(newConverterCommand())
 	rootCmd.AddCommand(newReplayerCommand())
 	rootCmd.AddCommand(newDumpEventsCommand())
+	rootCmd.AddCommand(newSendEventsCommand())
 	rootCmd.AddCommand(newMigrateCommand())
 
 	if err := rootCmd.Execute(); err != nil {

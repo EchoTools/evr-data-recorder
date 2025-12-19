@@ -72,16 +72,21 @@ session data from .echoreplay files.`,
 	cmd.Flags().String("bind", "127.0.0.1:6721", "Host:port to bind HTTP server to")
 	cmd.Flags().Bool("loop", false, "Loop playback continuously")
 
-	// Bind flags to viper
-	viper.BindPFlags(cmd.Flags())
+	// Bind flags to viper with proper namespacing
+	viper.BindPFlag("replayer.bind_address", cmd.Flags().Lookup("bind"))
+	viper.BindPFlag("replayer.loop", cmd.Flags().Lookup("loop"))
 
 	return cmd
 }
 
 func runReplayer(cmd *cobra.Command, args []string) error {
-	// Override config with command flags
-	cfg.Replayer.BindAddress = viper.GetString("bind")
-	cfg.Replayer.Loop = viper.GetBool("loop")
+	// Override config with command flags (only if explicitly set)
+	if cmd.Flags().Changed("bind") {
+		cfg.Replayer.BindAddress = viper.GetString("replayer.bind_address")
+	}
+	if cmd.Flags().Changed("loop") {
+		cfg.Replayer.Loop = viper.GetBool("replayer.loop")
+	}
 	cfg.Replayer.Files = args
 
 	// Validate configuration

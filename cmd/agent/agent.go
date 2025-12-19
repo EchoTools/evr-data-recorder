@@ -38,9 +38,9 @@ the HTTP API at the configured frequency, storing output to files.`,
 	}
 
 	// Agent-specific flags
-	cmd.Flags().Int("frequency", 10, "Polling frequency in Hz")
+	cmd.Flags().IntP("frequency", "f", 10, "Polling frequency in Hz")
 	cmd.Flags().String("format", "nevrcap", "Output format (nevrcap, replay, stream, or comma-separated)")
-	cmd.Flags().String("output", "output", "Output directory")
+	cmd.Flags().StringP("output", "o", "output", "Output directory")
 
 	// JWT token for API authentication
 	cmd.Flags().String("token", "", "JWT token for API authentication (stream and events)")
@@ -55,24 +55,54 @@ the HTTP API at the configured frequency, storing output to files.`,
 	cmd.Flags().Bool("events", false, "Enable sending frames to events API")
 	cmd.Flags().String("events-url", "http://localhost:8081", "Base URL of the events API")
 
-	// Bind flags to viper
-	viper.BindPFlags(cmd.Flags())
+	// Bind flags to viper - this must happen before PersistentPreRunE
+	viper.BindPFlag("agent.frequency", cmd.Flags().Lookup("frequency"))
+	viper.BindPFlag("agent.format", cmd.Flags().Lookup("format"))
+	viper.BindPFlag("agent.output_directory", cmd.Flags().Lookup("output"))
+	viper.BindPFlag("agent.jwt_token", cmd.Flags().Lookup("token"))
+	viper.BindPFlag("agent.stream_enabled", cmd.Flags().Lookup("stream"))
+	viper.BindPFlag("agent.stream_http_url", cmd.Flags().Lookup("stream-http"))
+	viper.BindPFlag("agent.stream_socket_url", cmd.Flags().Lookup("stream-socket"))
+	viper.BindPFlag("agent.stream_server_key", cmd.Flags().Lookup("stream-server-key"))
+	viper.BindPFlag("agent.events_enabled", cmd.Flags().Lookup("events"))
+	viper.BindPFlag("agent.events_url", cmd.Flags().Lookup("events-url"))
 
 	return cmd
 }
 
 func runAgent(cmd *cobra.Command, args []string) error {
-	// Override config with command flags
-	cfg.Agent.Frequency = viper.GetInt("frequency")
-	cfg.Agent.Format = viper.GetString("format")
-	cfg.Agent.OutputDirectory = viper.GetString("output")
-	cfg.Agent.JWTToken = viper.GetString("token")
-	cfg.Agent.StreamEnabled = viper.GetBool("stream")
-	cfg.Agent.StreamHTTPURL = viper.GetString("stream-http")
-	cfg.Agent.StreamSocketURL = viper.GetString("stream-socket")
-	cfg.Agent.StreamServerKey = viper.GetString("stream-server-key")
-	cfg.Agent.EventsEnabled = viper.GetBool("events")
-	cfg.Agent.EventsURL = viper.GetString("events-url")
+	// Override config with command flags (only if explicitly set)
+	// Viper has flags bound, so we can check if they were set and override config
+	if cmd.Flags().Changed("frequency") {
+		cfg.Agent.Frequency = viper.GetInt("agent.frequency")
+	}
+	if cmd.Flags().Changed("format") {
+		cfg.Agent.Format = viper.GetString("agent.format")
+	}
+	if cmd.Flags().Changed("output") {
+		cfg.Agent.OutputDirectory = viper.GetString("agent.output_directory")
+	}
+	if cmd.Flags().Changed("token") {
+		cfg.Agent.JWTToken = viper.GetString("agent.jwt_token")
+	}
+	if cmd.Flags().Changed("stream") {
+		cfg.Agent.StreamEnabled = viper.GetBool("agent.stream_enabled")
+	}
+	if cmd.Flags().Changed("stream-http") {
+		cfg.Agent.StreamHTTPURL = viper.GetString("agent.stream_http_url")
+	}
+	if cmd.Flags().Changed("stream-socket") {
+		cfg.Agent.StreamSocketURL = viper.GetString("agent.stream_socket_url")
+	}
+	if cmd.Flags().Changed("stream-server-key") {
+		cfg.Agent.StreamServerKey = viper.GetString("agent.stream_server_key")
+	}
+	if cmd.Flags().Changed("events") {
+		cfg.Agent.EventsEnabled = viper.GetBool("agent.events_enabled")
+	}
+	if cmd.Flags().Changed("events-url") {
+		cfg.Agent.EventsURL = viper.GetString("agent.events_url")
+	}
 
 	// Test connectivity to external services at startup
 	if err := testExternalServices(logger, cfg.Agent); err != nil {
