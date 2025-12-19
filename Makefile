@@ -11,12 +11,30 @@ GOARCH ?= $(shell go env GOARCH)
 # Windows-specific variables
 WINDOWS_BINARY := $(BINARY).exe
 
-.PHONY: all version build windows linux clean test bench
+.PHONY: all version build windows linux clean test bench lint install-hooks
 
 all: build
 
 version:
 	@echo $(VERSION)
+
+# Install git hooks
+install-hooks:
+	@echo "Installing git hooks..."
+	cp scripts/pre-commit .git/hooks/pre-commit
+	chmod +x .git/hooks/pre-commit
+	@echo "Git hooks installed."
+
+# Run linting
+lint:
+	@echo "Running linters..."
+	go fmt ./...
+	go vet ./...
+
+# Run smoke tests only
+smoke-test:
+	@echo "Running smoke tests..."
+	go test -v -short -run "^TestCLI" ./cmd/agent/...
 
 # Build the main consolidated binary
 build:
