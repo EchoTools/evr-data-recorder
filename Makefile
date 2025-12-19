@@ -11,27 +11,9 @@ GOARCH ?= $(shell go env GOARCH)
 # Windows-specific variables
 WINDOWS_BINARY := $(BINARY).exe
 
-.PHONY: all help version build windows linux clean test bench
+.PHONY: all version build windows linux clean test bench
 
-# Default target - show help
-.DEFAULT_GOAL := help
-
-help:
-	@echo "NEVR Agent - Available targets:"
-	@echo ""
-	@echo "  make help              Show this help message"
-	@echo "  make all               Clean, test, and build for all platforms"
-	@echo "  make build             Build for current OS/architecture ($(GOOS)/$(GOARCH))"
-	@echo "  make windows           Build Windows binary (windows/amd64)"
-	@echo "  make linux             Build Linux binary (linux/amd64)"
-	@echo "  make test              Run tests"
-	@echo "  make bench             Run benchmarks"
-	@echo "  make clean             Remove built binaries"
-	@echo "  make version           Display version"
-	@echo ""
-
-all: clean test build windows linux
-	@echo "✓ All build targets completed successfully"
+all: build
 
 version:
 	@echo $(VERSION)

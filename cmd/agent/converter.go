@@ -17,21 +17,21 @@ import (
 
 func newConverterCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "converter",
+		Use:   "convert",
 		Short: "Convert between .echoreplay and .nevrcap file formats",
-		Long: `The converter command converts replay files between the .echoreplay 
+		Long: `The convert command converts replay files between the .echoreplay 
 (zip format) and .nevrcap (zstd compressed) formats.`,
 		Example: `  # Convert echoreplay to nevrcap
-	  agent converter --input game.echoreplay
+	  agent convert --input game.echoreplay
 
   # Convert nevrcap to echoreplay
-	  agent converter --input game.nevrcap
+	  agent convert --input game.nevrcap
 
   # Force specific output format
-	  agent converter --input game.echoreplay --format nevrcap
+	  agent convert --input game.echoreplay --format nevrcap
 
   # Specify output file
-	  agent converter --input game.nevrcap --output converted.echoreplay`,
+	  agent convert --input game.nevrcap --output converted.echoreplay`,
 		RunE: runConverter,
 	}
 
@@ -45,37 +45,20 @@ func newConverterCommand() *cobra.Command {
 
 	cmd.MarkFlagRequired("input")
 
-	// Bind flags to viper with proper namespacing
-	viper.BindPFlag("converter.input_file", cmd.Flags().Lookup("input"))
-	viper.BindPFlag("converter.output_file", cmd.Flags().Lookup("output"))
-	viper.BindPFlag("converter.output_dir", cmd.Flags().Lookup("output-dir"))
-	viper.BindPFlag("converter.format", cmd.Flags().Lookup("format"))
-	viper.BindPFlag("converter.verbose", cmd.Flags().Lookup("verbose"))
-	viper.BindPFlag("converter.overwrite", cmd.Flags().Lookup("overwrite"))
+	// Bind flags to viper
+	viper.BindPFlags(cmd.Flags())
 
 	return cmd
 }
 
 func runConverter(cmd *cobra.Command, args []string) error {
-	// Override config with command flags (only if explicitly set)
-	if cmd.Flags().Changed("input") {
-		cfg.Converter.InputFile = viper.GetString("converter.input_file")
-	}
-	if cmd.Flags().Changed("output") {
-		cfg.Converter.OutputFile = viper.GetString("converter.output_file")
-	}
-	if cmd.Flags().Changed("output-dir") {
-		cfg.Converter.OutputDir = viper.GetString("converter.output_dir")
-	}
-	if cmd.Flags().Changed("format") {
-		cfg.Converter.Format = viper.GetString("converter.format")
-	}
-	if cmd.Flags().Changed("verbose") {
-		cfg.Converter.Verbose = viper.GetBool("converter.verbose")
-	}
-	if cmd.Flags().Changed("overwrite") {
-		cfg.Converter.Overwrite = viper.GetBool("converter.overwrite")
-	}
+	// Override config with command flags
+	cfg.Converter.InputFile = viper.GetString("input")
+	cfg.Converter.OutputFile = viper.GetString("output")
+	cfg.Converter.OutputDir = viper.GetString("output-dir")
+	cfg.Converter.Format = viper.GetString("format")
+	cfg.Converter.Verbose = viper.GetBool("verbose")
+	cfg.Converter.Overwrite = viper.GetBool("overwrite")
 
 	// Validate configuration
 	if err := cfg.ValidateConverterConfig(); err != nil {

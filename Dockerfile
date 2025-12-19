@@ -38,4 +38,4 @@ LABEL org.opencontainers.image.source="https://github.com/EchoTools/nevr-agent"
 LABEL org.opencontainers.image.vendor="EchoTools"
 
 # Run the binary
-CMD ["./agent", "apiserver"]
+CMD ["./agent", "serve"]

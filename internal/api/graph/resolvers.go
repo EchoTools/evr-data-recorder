@@ -8,10 +8,12 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/echotools/nevr-common/v4/gen/go/telemetry/v1"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 const (
@@ -19,15 +21,16 @@ const (
 	sessionEventCollectionName = "session_events"
 )
 
-// SessionEventDocument represents the MongoDB document structure
-type SessionEventDocument struct {
-	ID               primitive.ObjectID `bson:"_id,omitempty"`
-	LobbySessionUUID string             `bson:"lobby_session_id"`
-	UserID           string             `bson:"user_id,omitempty"`
-	FrameData        string             `bson:"frame,omitempty"`
-	Timestamp        time.Time          `bson:"timestamp"`
-	CreatedAt        time.Time          `bson:"created_at"`
-	UpdatedAt        time.Time          `bson:"updated_at"`
+// SessionFrameDocument represents the MongoDB document structure
+type SessionFrameDocument struct {
+	ID             primitive.ObjectID                `bson:"_id,omitempty"`
+	LobbySessionID string                            `bson:"lobby_session_id"`
+	UserID         string                            `bson:"user_id,omitempty"`
+	Frame          *telemetry.LobbySessionStateFrame `bson:"frame"`
+	EventTypes     []string                          `bson:"event_types,omitempty"`
+	Timestamp      time.Time                         `bson:"timestamp"`
+	CreatedAt      time.Time                         `bson:"created_at"`
+	UpdatedAt      time.Time                         `bson:"updated_at"`
 }
 
 // Query resolvers
@@ -48,7 +51,7 @@ func (r *Resolver) LobbySession(ctx context.Context, id string) (*LobbySession, 
 	}
 
 	// Get the first and last event to determine created/updated times
-	var firstEvent, lastEvent SessionEventDocument
+	var firstEvent, lastEvent SessionFrameDocument
 
 	opts := options.FindOne().SetSort(bson.D{{Key: "timestamp", Value: 1}})
 	if err := collection.FindOne(ctx, filter, opts).Decode(&firstEvent); err != nil {
@@ -89,31 +92,35 @@ func (r *Resolver) SessionEvents(ctx context.Context, lobbySessionID string, lim
 		limitVal = 1
 	}
 
-	events, totalCount, err := r.retrieveSessionEventsPaginated(ctx, lobbySessionID, int64(limitVal), int64(offsetVal))
+	frames, totalCount, err := r.retrieveSessionFramesPaginated(ctx, lobbySessionID, int64(limitVal), int64(offsetVal))
 	if err != nil {
 		return nil, err
 	}
 
-	edges := make([]*SessionEventEdge, 0, len(events))
-	for i, event := range events {
+	edges := make([]*SessionEventEdge, 0, len(frames))
+	for i, frame := range frames {
 		cursor := encodeCursor(offsetVal + i)
 
-		// Parse frame data as JSON
+		// Convert frame to JSON map
 		var frameData map[string]any
-		if event.FrameData != "" {
-			json.Unmarshal([]byte(event.FrameData), &frameData)
+		if frame.Frame != nil {
+			frameJSON, err := protojson.Marshal(frame.Frame)
+			if err == nil {
+				// Use standard json package to unmarshal to map
+				json.Unmarshal(frameJSON, &frameData)
+			}
 		}
 
 		edges = append(edges, &SessionEventEdge{
 			Cursor: cursor,
 			Node: &SessionEvent{
-				ID:             event.ID.Hex(),
-				LobbySessionID: event.LobbySessionUUID,
-				UserID:         &event.UserID,
+				ID:             frame.ID.Hex(),
+				LobbySessionID: frame.LobbySessionID,
+				UserID:         &frame.UserID,
 				FrameData:      frameData,
-				Timestamp:      event.Timestamp,
-				CreatedAt:      event.CreatedAt,
-				UpdatedAt:      event.UpdatedAt,
+				Timestamp:      frame.Timestamp,
+				CreatedAt:      frame.CreatedAt,
+				UpdatedAt:      frame.UpdatedAt,
 			},
 		})
 	}
@@ -139,18 +146,18 @@ func (r *Resolver) SessionEvents(ctx context.Context, lobbySessionID string, lim
 	}, nil
 }
 
-// retrieveSessionEventsPaginated retrieves session events with pagination
-func (r *Resolver) retrieveSessionEventsPaginated(ctx context.Context, matchID string, limit, offset int64) ([]*SessionEventDocument, int64, error) {
+// retrieveSessionFramesPaginated retrieves session frames with pagination
+func (r *Resolver) retrieveSessionFramesPaginated(ctx context.Context, sessionID string, limit, offset int64) ([]*SessionFrameDocument, int64, error) {
 	collection := r.MongoClient.Database(sessionEventDatabaseName).Collection(sessionEventCollectionName)
 
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	filter := bson.M{"lobby_session_id": matchID}
+	filter := bson.M{"lobby_session_id": sessionID}
 
 	totalCount, err := collection.CountDocuments(ctx, filter)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to count session events: %w", err)
+		return nil, 0, fmt.Errorf("failed to count session frames: %w", err)
 	}
 
 	opts := options.Find().
@@ -160,16 +167,16 @@ func (r *Resolver) retrieveSessionEventsPaginated(ctx context.Context, matchID s
 
 	cursor, err := collection.Find(ctx, filter, opts)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to query session events: %w", err)
+		return nil, 0, fmt.Errorf("failed to query session frames: %w", err)
 	}
 	defer cursor.Close(ctx)
 
-	var events []*SessionEventDocument
-	if err := cursor.All(ctx, &events); err != nil {
-		return nil, 0, fmt.Errorf("failed to decode session events: %w", err)
+	var frames []*SessionFrameDocument
+	if err := cursor.All(ctx, &frames); err != nil {
+		return nil, 0, fmt.Errorf("failed to decode session frames: %w", err)
 	}
 
-	return events, totalCount, nil
+	return frames, totalCount, nil
 }
 
 // Health resolves the health query
@@ -192,10 +199,19 @@ func (r *Resolver) Health(ctx context.Context) (*HealthStatus, error) {
 func (r *Resolver) StoreSessionEvent(ctx context.Context, input StoreSessionEventInput) (*StoreSessionEventPayload, error) {
 	collection := r.MongoClient.Database(sessionEventDatabaseName).Collection(sessionEventCollectionName)
 
-	// Serialize frame data to JSON string
+	// Convert input.FrameData (map[string]any) to LobbySessionStateFrame
 	frameDataBytes, err := json.Marshal(input.FrameData)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to serialize frame data: %v", err)
+		return &StoreSessionEventPayload{
+			Success: false,
+			Error:   &errMsg,
+		}, nil
+	}
+
+	frame := &telemetry.LobbySessionStateFrame{}
+	if err := protojson.Unmarshal(frameDataBytes, frame); err != nil {
+		errMsg := fmt.Sprintf("failed to parse frame data: %v", err)
 		return &StoreSessionEventPayload{
 			Success: false,
 			Error:   &errMsg,
@@ -207,23 +223,34 @@ func (r *Resolver) StoreSessionEvent(ctx context.Context, input StoreSessionEven
 		userID = *input.UserID
 	}
 
+	// Extract event types
+	eventTypes := make([]string, 0, len(frame.GetEvents()))
+	for _, evt := range frame.GetEvents() {
+		if evt != nil && evt.Event != nil {
+			// Get the event type name from the oneof
+			eventType := fmt.Sprintf("%T", evt.Event)
+			eventTypes = append(eventTypes, eventType)
+		}
+	}
+
 	now := time.Now().UTC()
-	event := &SessionEventDocument{
-		ID:               primitive.NewObjectID(),
-		LobbySessionUUID: input.LobbySessionID,
-		UserID:           userID,
-		FrameData:        string(frameDataBytes),
-		Timestamp:        now,
-		CreatedAt:        now,
-		UpdatedAt:        now,
+	doc := &SessionFrameDocument{
+		ID:             primitive.NewObjectID(),
+		LobbySessionID: input.LobbySessionID,
+		UserID:         userID,
+		Frame:          frame,
+		EventTypes:     eventTypes,
+		Timestamp:      frame.Timestamp.AsTime(),
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	_, err = collection.InsertOne(ctx, event)
+	_, err = collection.InsertOne(ctx, doc)
 	if err != nil {
-		errMsg := fmt.Sprintf("failed to store event: %v", err)
+		errMsg := fmt.Sprintf("failed to store frame: %v", err)
 		return &StoreSessionEventPayload{
 			Success: false,
 			Error:   &errMsg,
@@ -233,13 +260,13 @@ func (r *Resolver) StoreSessionEvent(ctx context.Context, input StoreSessionEven
 	return &StoreSessionEventPayload{
 		Success: true,
 		Event: &SessionEvent{
-			ID:             event.ID.Hex(),
-			LobbySessionID: event.LobbySessionUUID,
-			UserID:         &event.UserID,
+			ID:             doc.ID.Hex(),
+			LobbySessionID: doc.LobbySessionID,
+			UserID:         &doc.UserID,
 			FrameData:      input.FrameData,
-			Timestamp:      event.Timestamp,
-			CreatedAt:      event.CreatedAt,
-			UpdatedAt:      event.UpdatedAt,
+			Timestamp:      doc.Timestamp,
+			CreatedAt:      doc.CreatedAt,
+			UpdatedAt:      doc.UpdatedAt,
 		},
 	}, nil
 }

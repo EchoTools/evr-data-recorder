@@ -33,6 +33,7 @@ agent:
 apiserver:
   server_address: ":8081"
   mongo_uri: mongodb://localhost:27017
+  jwt_secret: "your-secret-key-here-change-this-in-production"
 
 # Converter configuration
 converter:

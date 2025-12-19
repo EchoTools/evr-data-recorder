@@ -21,7 +21,7 @@ import (
 
 func newDumpEventsCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "dumpevents <replay-file> [output-format]",
+		Use:   "show <replay-file> [output-format]",
 		Short: "Extract and display events from replay files",
 		Long: `Process replay files (.echoreplay or .nevrcap) and output detected events.
 
@@ -36,13 +36,13 @@ Output formats:
   text     - Human-readable text format
   summary  - Event summary statistics`,
 		Example: `  # Output events as JSON (default)
-  agent dumpevents game.echoreplay
+  agent show game.echoreplay
 
   # Output as human-readable text
-  agent dumpevents game.nevrcap text
+  agent show game.nevrcap text
 
   # Show event summary statistics
-  agent dumpevents game.echoreplay summary`,
+  agent show game.echoreplay summary`,
 		Args: cobra.RangeArgs(1, 2),
 		RunE: runDumpEvents,
 	}

@@ -22,6 +22,9 @@ type Config struct {
 	// HTTP server configuration
 	ServerAddress string `json:"server_address" yaml:"server_address"`
 
+	// JWT configuration
+	JWTSecret string `json:"jwt_secret" yaml:"jwt_secret"`
+
 	// AMQP configuration
 	AMQPURI       string `json:"amqp_uri" yaml:"amqp_uri"`
 	AMQPQueueName string `json:"amqp_queue_name" yaml:"amqp_queue_name"`
@@ -52,11 +55,14 @@ func DefaultConfig() *Config {
 		serverAddress = ":8080"
 	}
 
+	jwtSecret := os.Getenv("EVR_APISERVER_JWT_SECRET")
+
 	return &Config{
 		MongoURI:       mongoURI,
 		DatabaseName:   sessionEventDatabaseName,
 		CollectionName: sessionEventCollectionName,
 		ServerAddress:  serverAddress,
+		JWTSecret:      jwtSecret,
 		AMQPURI:        amqpURI,
 		AMQPQueueName:  amqp.DefaultQueueName,
 		AMQPEnabled:    amqpEnabled,
@@ -78,6 +84,9 @@ func (c *Config) Validate() error {
 	}
 	if c.ServerAddress == "" {
 		return fmt.Errorf("server_address is required")
+	}
+	if c.JWTSecret == "" {
+		return fmt.Errorf("jwt_secret is required")
 	}
 	if c.AMQPEnabled && c.AMQPURI == "" {
 		return fmt.Errorf("amqp_uri is required when AMQP is enabled")
@@ -147,7 +156,7 @@ func (s *Service) Initialize(ctx context.Context) error {
 	}
 
 	// Create HTTP server
-	s.server = NewServer(s.mongoClient, s.logger)
+	s.server = NewServer(s.mongoClient, s.logger, s.config.JWTSecret)
 
 	// Set the AMQP publisher on the server if available
 	if s.amqpPublisher != nil {
@@ -186,13 +195,13 @@ func (s *Service) createIndexes(ctx context.Context) error {
 	defer cancel()
 
 	// Create index on lobby_session_id for faster queries
-	indexModel := mongo.IndexModel{
+	sessionIDIndex := mongo.IndexModel{
 		Keys: bson.D{
 			{Key: "lobby_session_id", Value: 1},
 		},
 	}
 
-	_, err := collection.Indexes().CreateOne(ctx, indexModel)
+	_, err := collection.Indexes().CreateOne(ctx, sessionIDIndex)
 	if err != nil {
 		return fmt.Errorf("failed to create lobby_session_id index: %w", err)
 	}
@@ -208,6 +217,32 @@ func (s *Service) createIndexes(ctx context.Context) error {
 	_, err = collection.Indexes().CreateOne(ctx, timestampIndexModel)
 	if err != nil {
 		return fmt.Errorf("failed to create lobby_session_id+timestamp index: %w", err)
+	}
+
+	// Create index on event_types for event type queries
+	eventTypesIndex := mongo.IndexModel{
+		Keys: bson.D{
+			{Key: "event_types", Value: 1},
+		},
+	}
+
+	_, err = collection.Indexes().CreateOne(ctx, eventTypesIndex)
+	if err != nil {
+		return fmt.Errorf("failed to create event_types index: %w", err)
+	}
+
+	// Create compound index on lobby_session_id and event_types for filtered queries
+	compoundEventIndex := mongo.IndexModel{
+		Keys: bson.D{
+			{Key: "lobby_session_id", Value: 1},
+			{Key: "event_types", Value: 1},
+			{Key: "timestamp", Value: 1},
+		},
+	}
+
+	_, err = collection.Indexes().CreateOne(ctx, compoundEventIndex)
+	if err != nil {
+		return fmt.Errorf("failed to create lobby_session_id+event_types+timestamp index: %w", err)
 	}
 
 	s.logger.Debug("Created database indexes")

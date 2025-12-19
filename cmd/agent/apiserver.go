@@ -36,40 +36,37 @@ func (z *zapLoggerAdapter) Warn(msg string, fields ...any) {
 
 func newAPIServerCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "apiserver",
+		Use:   "serve",
 		Short: "Run the session events API server",
-		Long: `The apiserver command starts an HTTP server that provides endpoints 
+		Long: `The serve command starts an HTTP server that provides endpoints 
 for storing and retrieving session event data.`,
 		Example: `  # Start API server on default port
-	agent apiserver
+	agent serve
 
   # Start with custom MongoDB URI
-	agent apiserver --mongo-uri mongodb://localhost:27017
+	agent serve --mongo-uri mongodb://localhost:27017
 
   # Use a config file
-	agent apiserver -c config.yaml`,
+	agent serve -c config.yaml`,
 		RunE: runAPIServer,
 	}
 
 	// APIServer-specific flags
 	cmd.Flags().String("server-address", ":8081", "Server listen address")
 	cmd.Flags().String("mongo-uri", "mongodb://localhost:27017", "MongoDB connection URI")
+	cmd.Flags().String("jwt-secret", "", "JWT secret key for token validation")
 
-	// Bind flags to viper with proper namespacing
-	viper.BindPFlag("apiserver.server_address", cmd.Flags().Lookup("server-address"))
-	viper.BindPFlag("apiserver.mongo_uri", cmd.Flags().Lookup("mongo-uri"))
+	// Bind flags to viper
+	viper.BindPFlags(cmd.Flags())
 
 	return cmd
 }
 
 func runAPIServer(cmd *cobra.Command, args []string) error {
-	// Override config with command flags (only if explicitly set)
-	if cmd.Flags().Changed("server-address") {
-		cfg.APIServer.ServerAddress = viper.GetString("apiserver.server_address")
-	}
-	if cmd.Flags().Changed("mongo-uri") {
-		cfg.APIServer.MongoURI = viper.GetString("apiserver.mongo_uri")
-	}
+	// Override config with command flags
+	cfg.APIServer.ServerAddress = viper.GetString("server-address")
+	cfg.APIServer.MongoURI = viper.GetString("mongo-uri")
+	cfg.APIServer.JWTSecret = viper.GetString("jwt-secret")
 
 	// Validate configuration
 	if err := cfg.ValidateAPIServerConfig(); err != nil {
@@ -84,6 +81,7 @@ func runAPIServer(cmd *cobra.Command, args []string) error {
 	serviceConfig := api.DefaultConfig()
 	serviceConfig.MongoURI = cfg.APIServer.MongoURI
 	serviceConfig.ServerAddress = cfg.APIServer.ServerAddress
+	serviceConfig.JWTSecret = cfg.APIServer.JWTSecret
 
 	// Create service
 	service, err := api.NewService(serviceConfig, &zapLoggerAdapter{logger: logger})
@@ -117,6 +115,7 @@ func runAPIServer(cmd *cobra.Command, args []string) error {
 	logger.Info("Available endpoints:",
 		zap.String("POST", "/lobby-session-events - Store session event"),
 		zap.String("GET", "/lobby-session-events/{match_id} - Get session events by match ID"),
+		zap.String("WebSocket", "/v3/stream - WebSocket stream with JWT auth"),
 		zap.String("GET", "/health - Health check"))
 
 	if err := service.Start(ctx); err != nil {

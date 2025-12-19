@@ -34,6 +34,7 @@ type Server struct {
 	graphqlResolver *graph.Resolver
 	corsHandler     *cors.Cors
 	amqpPublisher   *amqp.Publisher
+	jwtSecret       string
 }
 
 // Logger interface for abstracting logging
@@ -69,7 +70,7 @@ func (s *Server) SetAMQPPublisher(publisher *amqp.Publisher) {
 }
 
 // NewServer creates a new session events HTTP server
-func NewServer(mongoClient *mongo.Client, logger Logger) *Server {
+func NewServer(mongoClient *mongo.Client, logger Logger, jwtSecret string) *Server {
 	if logger == nil {
 		logger = &DefaultLogger{}
 	}
@@ -83,6 +84,7 @@ func NewServer(mongoClient *mongo.Client, logger Logger) *Server {
 		logger:          logger,
 		graphqlResolver: graph.NewResolver(mongoClient),
 		corsHandler:     createCORSHandler(),
+		jwtSecret:       jwtSecret,
 	}
 
 	s.setupRoutes()
@@ -150,6 +152,9 @@ func (s *Server) setupRoutes() {
 	v3.HandleFunc("/lobby-session-events", s.storeSessionEventHandlerV3).Methods("POST")
 	v3.HandleFunc("/lobby-session-events/{lobby_session_id}", s.getSessionEventsHandlerV3).Methods("GET")
 
+	// WebSocket stream endpoint with JWT authentication
+	v3.HandleFunc("/stream", JWTMiddleware(s.jwtSecret, s.WebSocketStreamHandler)).Methods("GET")
+
 	// Add a NotFoundHandler for debugging unmatched routes
 	s.router.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		s.logger.Warn("Route not found", "method", r.Method, "path", r.URL.Path)
@@ -211,26 +216,22 @@ func (s *Server) storeSessionEventHandler(w http.ResponseWriter, r *http.Request
 	// Extract user ID from request headers
 	userID := r.Header.Get("X-User-ID")
 
+	lobbySessionID := msg.GetSession().GetSessionId()
 	matchID := MatchID{
-		UUID: uuid.FromStringOrNil(msg.GetSession().GetSessionId()),
+		UUID: uuid.FromStringOrNil(lobbySessionID),
 		Node: node,
 	}
 
 	if !matchID.IsValid() {
-		s.logger.Error("Invalid match ID", "lobby_session_id", msg.GetSession().GetSessionId(), "node", node)
+		s.logger.Error("Invalid match ID", "lobby_session_id", lobbySessionID, "node", node)
 		http.Error(w, "Invalid match ID in payload", http.StatusBadRequest)
 		return
 	}
 
-	event := &SessionEvent{
-		LobbySessionUUID: matchID.UUID.String(),
-		UserID:           userID,
-		FrameData:        string(payload),
-	}
-	// Store the event to MongoDB
-	if err := StoreSessionEvent(ctx, s.mongoClient, event); err != nil {
-		s.logger.Error("Failed to store session event", "error", err, "lobby_session_id", event.LobbySessionUUID)
-		http.Error(w, "Failed to store session event", http.StatusInternalServerError)
+	// Store the frame to MongoDB
+	if err := StoreSessionFrame(ctx, s.mongoClient, lobbySessionID, userID, msg); err != nil {
+		s.logger.Error("Failed to store session frame", "error", err, "lobby_session_id", lobbySessionID)
+		http.Error(w, "Failed to store session frame", http.StatusInternalServerError)
 		return
 	}
 
@@ -238,20 +239,20 @@ func (s *Server) storeSessionEventHandler(w http.ResponseWriter, r *http.Request
 	if s.amqpPublisher != nil && s.amqpPublisher.IsConnected() {
 		amqpEvent := &amqp.MatchEvent{
 			Type:           "session.frame",
-			LobbySessionID: event.LobbySessionUUID,
+			LobbySessionID: lobbySessionID,
 			UserID:         userID,
-			Timestamp:      event.Timestamp,
+			Timestamp:      msg.Timestamp.AsTime(),
 		}
 		if err := s.amqpPublisher.Publish(ctx, amqpEvent); err != nil {
 			// Log error but don't fail the request - AMQP is best-effort
-			s.logger.Warn("Failed to publish AMQP event", "error", err, "lobby_session_id", event.LobbySessionUUID)
+			s.logger.Warn("Failed to publish AMQP event", "error", err, "lobby_session_id", lobbySessionID)
 		}
 	}
 
 	// Return success response
 	response := map[string]any{
 		"success":          true,
-		"lobby_session_id": event.LobbySessionUUID,
+		"lobby_session_id": lobbySessionID,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -261,7 +262,7 @@ func (s *Server) storeSessionEventHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	s.logger.Debug("Stored session event", "session_uuid", event.LobbySessionUUID)
+	s.logger.Debug("Stored session frame", "session_uuid", lobbySessionID)
 }
 
 // getSessionEventsHandlerV1 handles GET requests to retrieve session events (v1 legacy format)
@@ -275,20 +276,25 @@ func (s *Server) getSessionEventsHandlerV1(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Retrieve events from MongoDB
-	events, err := RetrieveSessionEventsByMatchID(ctx, s.mongoClient, sessionID)
+	// Retrieve frames from MongoDB
+	frames, err := RetrieveSessionFramesBySessionID(ctx, s.mongoClient, sessionID)
 	if err != nil {
-		s.logger.Error("Failed to retrieve session events", "error", err, "lobby_session_id", sessionID)
-		http.Error(w, "Failed to retrieve session events", http.StatusInternalServerError)
+		s.logger.Error("Failed to retrieve session frames", "error", err, "lobby_session_id", sessionID)
+		http.Error(w, "Failed to retrieve session frames", http.StatusInternalServerError)
 		return
 	}
 
-	// Return response in v1 legacy format (transform at read-time)
-	entries := make([]*SessionEventResponseEntry, 0, len(events))
-	for _, e := range events {
+	// Return response in v1 legacy format (convert frames to JSON)
+	entries := make([]*SessionEventResponseEntry, 0, len(frames))
+	for _, f := range frames {
+		frameJSON, err := FrameToJSON(f.Frame)
+		if err != nil {
+			s.logger.Warn("Failed to convert frame to JSON", "error", err)
+			continue
+		}
 		entry := &SessionEventResponseEntry{
-			UserID:    e.UserID,
-			FrameData: (json.RawMessage)([]byte(e.FrameData)),
+			UserID:    f.UserID,
+			FrameData: (json.RawMessage)(frameJSON),
 		}
 		entries = append(entries, entry)
 	}
@@ -306,7 +312,7 @@ func (s *Server) getSessionEventsHandlerV1(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	s.logger.Debug("Retrieved session events (v1)", "lobby_session_id", sessionID, "count", len(events))
+	s.logger.Debug("Retrieved session frames (v1)", "lobby_session_id", sessionID, "count", len(frames))
 }
 
 // getSessionEventsHandlerV3 handles GET requests to retrieve session events (v3 format with full schema)
@@ -320,18 +326,24 @@ func (s *Server) getSessionEventsHandlerV3(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Retrieve events from MongoDB with pagination
-	events, totalCount, err := RetrieveSessionEventsPaginated(ctx, s.mongoClient, sessionID, 100, 0)
+	// Parse optional event_type query parameter
+	var eventType *string
+	if et := r.URL.Query().Get("event_type"); et != "" {
+		eventType = &et
+	}
+
+	// Retrieve frames from MongoDB with pagination
+	frames, totalCount, err := RetrieveSessionFramesPaginated(ctx, s.mongoClient, sessionID, eventType, 100, 0)
 	if err != nil {
-		s.logger.Error("Failed to retrieve session events", "error", err, "lobby_session_id", sessionID)
-		http.Error(w, "Failed to retrieve session events", http.StatusInternalServerError)
+		s.logger.Error("Failed to retrieve session frames", "error", err, "lobby_session_id", sessionID)
+		http.Error(w, "Failed to retrieve session frames", http.StatusInternalServerError)
 		return
 	}
 
 	// Return response in v3 format (full schema with timestamps)
 	response := &SessionResponseV3{
 		LobbySessionUUID: sessionID,
-		Events:           events,
+		Frames:           frames,
 		TotalCount:       totalCount,
 	}
 
@@ -343,7 +355,7 @@ func (s *Server) getSessionEventsHandlerV3(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	s.logger.Debug("Retrieved session events (v3)", "lobby_session_id", sessionID, "count", len(events))
+	s.logger.Debug("Retrieved session frames (v3)", "lobby_session_id", sessionID, "count", len(frames))
 }
 
 // storeSessionEventHandlerV3 handles POST requests to store session events (v3 format)
@@ -435,9 +447,9 @@ type SessionResponse struct {
 
 // SessionResponseV3 represents the v3 API response format with full schema
 type SessionResponseV3 struct {
-	LobbySessionUUID string          `json:"lobby_session_id"`
-	Events           []*SessionEvent `json:"events"`
-	TotalCount       int64           `json:"total_count"`
+	LobbySessionUUID string                  `json:"lobby_session_id"`
+	Frames           []*SessionFrameDocument `json:"frames"`
+	TotalCount       int64                   `json:"total_count"`
 }
 
 // SessionEventResponseEntry represents a simple session event object (v1 format)

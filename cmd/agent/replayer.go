@@ -49,21 +49,21 @@ type FrameResponse struct {
 
 func newReplayerCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "replayer [replay-file...]",
+		Use:   "replay [replay-file...]",
 		Short: "Replay recorded sessions via HTTP server",
-		Long: `The replayer command starts an HTTP server that plays back recorded 
+		Long: `The replay command starts an HTTP server that plays back recorded 
 session data from .echoreplay files.`,
 		Example: `  # Replay a single file
-	  agent replayer game.echoreplay
+	  agent replay game.echoreplay
 
   # Replay multiple files in sequence
-	  agent replayer game1.echoreplay game2.echoreplay
+	  agent replay game1.echoreplay game2.echoreplay
 
   # Replay in loop mode
-	  agent replayer --loop game.echoreplay
+	  agent replay --loop game.echoreplay
 
   # Custom bind address
-	  agent replayer --bind 0.0.0.0:8080 game.echoreplay`,
+	  agent replay --bind 0.0.0.0:8080 game.echoreplay`,
 		RunE: runReplayer,
 		Args: cobra.MinimumNArgs(1),
 	}
@@ -72,21 +72,16 @@ session data from .echoreplay files.`,
 	cmd.Flags().String("bind", "127.0.0.1:6721", "Host:port to bind HTTP server to")
 	cmd.Flags().Bool("loop", false, "Loop playback continuously")
 
-	// Bind flags to viper with proper namespacing
-	viper.BindPFlag("replayer.bind_address", cmd.Flags().Lookup("bind"))
-	viper.BindPFlag("replayer.loop", cmd.Flags().Lookup("loop"))
+	// Bind flags to viper
+	viper.BindPFlags(cmd.Flags())
 
 	return cmd
 }
 
 func runReplayer(cmd *cobra.Command, args []string) error {
-	// Override config with command flags (only if explicitly set)
-	if cmd.Flags().Changed("bind") {
-		cfg.Replayer.BindAddress = viper.GetString("replayer.bind_address")
-	}
-	if cmd.Flags().Changed("loop") {
-		cfg.Replayer.Loop = viper.GetBool("replayer.loop")
-	}
+	// Override config with command flags
+	cfg.Replayer.BindAddress = viper.GetString("bind")
+	cfg.Replayer.Loop = viper.GetBool("loop")
 	cfg.Replayer.Files = args
 
 	// Validate configuration

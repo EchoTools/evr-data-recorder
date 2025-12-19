@@ -20,7 +20,7 @@ import (
 
 func newSendEventsCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "sendevents <replay-file>",
+		Use:   "push <replay-file>",
 		Short: "Extract events from replay files and send them to the events API",
 		Long: `Process replay files (.echoreplay or .nevrcap), detect events, 
 and send them to the configured events API endpoint.
@@ -36,16 +36,16 @@ Supported file formats:
   .nevrcap               - NEVR capture format (zstd compressed)
   .nevrcap.uncompressed  - NEVR capture format (uncompressed)`,
 		Example: `  # Send events from a replay file to the default events API
-  agent sendevents game.echoreplay --events-url https://g.echovrce.com/lobby-session-events
+  agent push game.echoreplay --events-url https://g.echovrce.com/lobby-session-events
 
   # Send events with authentication
-  agent sendevents game.nevrcap --events-url https://api.example.com/events --token mytoken
+  agent push game.nevrcap --events-url https://api.example.com/events --token mytoken
 
   # Send events at a specific rate (frames per second)
-  agent sendevents game.echoreplay --rate 60 --events-url https://api.example.com/events
+  agent push game.echoreplay --rate 60 --events-url https://api.example.com/events
 
   # Dry-run mode - detect events without sending
-  agent sendevents game.nevrcap --dry-run`,
+  agent push game.nevrcap --dry-run`,
 		Args: cobra.ExactArgs(1),
 		RunE: runSendEvents,
 	}

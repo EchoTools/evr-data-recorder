@@ -1,15 +1,13 @@
-# NEVR Agent
+# nevr-agent
 
-NEVR Agent is a unified CLI for recording, streaming, converting, and replaying EchoVR game telemetry data.
+nevr-agent is a single CLI binary (`agent`) for recording, converting, and replaying EchoVR game session and player bone data.
 
 ## Features
 
-- **Agent**: Capture session and player bone data from EchoVR game servers via HTTP API polling
+- **Agent**: Record session and player bone data from EchoVR game servers via HTTP API polling
 - **API Server**: HTTP server for storing and retrieving session event data with MongoDB backend
 - **Converter**: Convert between .echoreplay (zip) and .nevrcap (zstd compressed) file formats
 - **Replayer**: HTTP server for replaying recorded session data
-- **Dump Events**: Extract and display detected events from replay files
-- **Migrate**: Run database schema migrations
 
 ## Prerequisites
 
@@ -20,21 +18,7 @@ NEVR Agent is a unified CLI for recording, streaming, converting, and replaying 
 
 ### Download Pre-built Binaries
 
-Download the latest release for your platform from the [Releases](https://github.com/echotools/nevr-agent/v4/releases) page.
-
-### Use Container Image
-
-The project is published to GitHub Container Registry (ghcr.io). Pull the latest image:
-
-```bash
-docker pull ghcr.io/echotools/nevr-agent:latest
-```
-
-Run the API server in a container with dependencies:
-
-```bash
-docker-compose up
-```
+Download the latest release for your platform from the [Releases](https://github.com/EchoTools/nevr-agent/releases) page.
 
 ### Build from Source
 
@@ -43,7 +27,7 @@ docker-compose up
 git clone https://github.com/EchoTools/nevr-agent.git
 cd nevr-agent
 
-# Build the binary
+# Build the consolidated binary
 make build
 
 # Or build for specific platforms
@@ -53,14 +37,14 @@ make windows  # Build for Windows
 
 ## Usage
 
-The `agent` binary provides a unified CLI with subcommands for different functionality.
+The `agent` application provides a unified CLI with subcommands for different functionality.
 
 ```bash
 # View available commands
 agent --help
 
 # Get help for a specific command
-agent agent --help
+agent stream --help
 ```
 
 ### Agent - Record Game Data
@@ -69,13 +53,13 @@ Record session and player bone data from EchoVR game servers:
 
 ```bash
 # Basic recording from localhost ports 6721-6730 at 30Hz
-agent agent --frequency 30 --output ./output 127.0.0.1:6721-6730
+agent stream --frequency 30 --output ./output 127.0.0.1:6721-6730
 
-# Record with streaming enabled (requires JWT token)
-agent agent --stream --token $JWT_TOKEN 127.0.0.1:6721
+# Record with streaming to Nakama server
+agent stream --stream --stream-username myuser --stream-password mypass 127.0.0.1:6721
 
 # Record with Events API enabled
-agent agent --events --events-url http://localhost:8081 --token $JWT_TOKEN 127.0.0.1:6721-6730
+agent stream --events --events-url http://localhost:8081 127.0.0.1:6721-6730
 ```
 
 ### API Server - Session Events API
@@ -84,10 +68,10 @@ Run an HTTP server for storing and retrieving session events:
 
 ```bash
 # Start with default settings
-agent apiserver
+agent serve
 
 # Custom MongoDB URI and port
-agent apiserver --mongo-uri mongodb://localhost:27017 --server-address :8081
+agent serve --mongo-uri mongodb://localhost:27017 --server-address :8081
 ```
 
 ### Converter - Format Conversion
@@ -96,13 +80,13 @@ Convert between replay file formats:
 
 ```bash
 # Auto-detect conversion (echoreplay → nevrcap or vice versa)
-agent converter --input game.echoreplay
+evrtelemetry convert --input game.echoreplay
 
 # Specify output file
-agent converter --input game.nevrcap --output converted.echoreplay
+evrtelemetry convert --input game.nevrcap --output converted.echoreplay
 
 # Force specific format
-agent converter --input game.echoreplay --format nevrcap
+evrtelemetry convert --input game.echoreplay --format nevrcap
 ```
 
 ### Replayer - Replay Sessions
@@ -111,43 +95,16 @@ Replay recorded sessions via HTTP server:
 
 ```bash
 # Replay a single file
-agent replayer game.echoreplay
+evrtelemetry replay game.echoreplay
 
 # Replay multiple files in sequence
-agent replayer game1.echoreplay game2.echoreplay
+evrtelemetry replay game1.echoreplay game2.echoreplay
 
 # Loop playback continuously
-agent replayer --loop game.echoreplay
+evrtelemetry replay --loop game.echoreplay
 
 # Custom bind address
-agent replayer --bind 0.0.0.0:8080 game.echoreplay
-```
-
-### Dump Events - Extract Events from Replay Files
-
-Extract and display detected events from replay files:
-
-```bash
-# Output events as JSON (default)
-agent dumpevents game.echoreplay
-
-# Output as human-readable text
-agent dumpevents game.nevrcap text
-
-# Show event summary statistics
-agent dumpevents game.echoreplay summary
-```
-
-### Migrate - Database Migrations
-
-Run database schema migrations:
-
-```bash
-# Run migration with default MongoDB URI
-agent migrate
-
-# Run migration with custom MongoDB URI
-agent migrate --mongo-uri mongodb://user:pass@localhost:27017/dbname
+evrtelemetry replay --bind 0.0.0.0:8080 game.echoreplay
 ```
 
 ## Configuration
@@ -155,13 +112,13 @@ agent migrate --mongo-uri mongodb://user:pass@localhost:27017/dbname
 The application supports multiple configuration methods (in order of precedence):
 
 1. **Command-line flags** (highest priority)
-2. **Environment variables** (prefix with `NEVR_`)
+2. **Environment variables** (prefix with `EVR_`)
 3. **Configuration file** (YAML format)
 4. **Default values** (lowest priority)
 
 ### Configuration File
 
-Create an `agent.yaml` file in your working directory or specify with `--config`:
+Create a `evrtelemetry.yaml` file in your working directory or specify with `--config`:
 
 ```yaml
 # Global configuration
@@ -172,7 +129,6 @@ log_level: info
 agent:
   frequency: 10
   output_directory: ./output
-  jwt_token: ""  # JWT token for API authentication
   stream_enabled: false
 
 # API Server configuration
@@ -181,23 +137,34 @@ apiserver:
   mongo_uri: mongodb://localhost:27017
 ```
 
+See [evrtelemetry.yaml.example](evrtelemetry.yaml.example) for a complete example.
+
 ### Environment Variables
 
-All configuration can be set via environment variables with the `NEVR_` prefix:
+All configuration can be set via environment variables with the `EVR_` prefix:
 
 ```bash
-# JWT token for API authentication
-export NEVR_AGENT_JWT_TOKEN=your-jwt-token
-
 # Agent configuration
-export NEVR_AGENT_FREQUENCY=30
-export NEVR_AGENT_OUTPUT_DIRECTORY=./recordings
+export EVR_AGENT_FREQUENCY=30
+export EVR_AGENT_OUTPUT_DIRECTORY=./recordings
+
+# Stream credentials
+export EVR_AGENT_STREAM_USERNAME=myuser
+export EVR_AGENT_STREAM_PASSWORD=mypassword
 
 # Run the agent
-agent agent 127.0.0.1:6721-6730
+evrtelemetry stream 127.0.0.1:6721-6730
 ```
 
 You can also use a `.env` file. See [.env.example](.env.example) for all available variables.
+
+### Credential Management
+
+Credentials (API keys, passwords, database URIs) can be managed securely:
+
+- **Environment variables**: Set sensitive values as environment variables
+- **.env file**: Store credentials in a `.env` file (never commit this file!)
+- **Config file**: Use for non-sensitive configuration (can be committed)
 
 ## Development
 
@@ -206,6 +173,9 @@ You can also use a `.env` file. See [.env.example](.env.example) for all availab
 ```bash
 # Build for current OS
 make build
+
+# Build all legacy individual commands
+make legacy
 
 # Run tests
 make test

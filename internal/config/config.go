@@ -56,6 +56,7 @@ type AgentConfig struct {
 type APIServerConfig struct {
 	ServerAddress string `yaml:"server_address" mapstructure:"server_address"`
 	MongoURI      string `yaml:"mongo_uri" mapstructure:"mongo_uri"`
+	JWTSecret     string `yaml:"jwt_secret" mapstructure:"jwt_secret"`
 }
 
 // ConverterConfig holds configuration for the converter subcommand
@@ -93,6 +94,7 @@ func DefaultConfig() *Config {
 		APIServer: APIServerConfig{
 			ServerAddress: ":8081",
 			MongoURI:      "mongodb://localhost:27017",
+			JWTSecret:     "",
 		},
 		Converter: ConverterConfig{
 			OutputDir: "./",
@@ -206,6 +208,9 @@ func (c *Config) ValidateAPIServerConfig() error {
 	}
 	if c.APIServer.MongoURI == "" {
 		return fmt.Errorf("mongo URI must be specified")
+	}
+	if c.APIServer.JWTSecret == "" {
+		return fmt.Errorf("jwt secret must be specified")
 	}
 	return nil
 }
