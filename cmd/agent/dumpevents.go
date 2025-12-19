@@ -11,12 +11,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/echotools/nevr-common/v4/gen/go/telemetry/v1"
+	telemetry "github.com/echotools/nevr-common/v4/gen/go/telemetry/v1"
 	"github.com/echotools/nevrcap/v3/pkg/codecs"
 	"github.com/echotools/nevrcap/v3/pkg/processing"
 	"github.com/klauspost/compress/zstd"
 	"github.com/spf13/cobra"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func newDumpEventsCommand() *cobra.Command {
@@ -116,7 +117,7 @@ func processReplayFile(filename, outputFormat string) error {
 	// Statistics for summary mode
 	eventStats := make(map[string]int)
 	frameCount := 0
-	var startTime, endTime time.Time
+	var startTime, endTime *timestamppb.Timestamp
 
 	var (
 		frameMu         sync.RWMutex
@@ -203,9 +204,8 @@ func processReplayFile(filename, outputFormat string) error {
 
 		// Track timing for summary
 		if frameCount == 1 {
-			startTime = frame.Timestamp.AsTime()
+			startTime = frame.Timestamp
 		}
-		endTime = frame.Timestamp.AsTime()
 
 		frameMu.Lock()
 		currentFrame = frame
@@ -215,6 +215,8 @@ func processReplayFile(filename, outputFormat string) error {
 		detector.DetectEvents(frame)
 	}
 
+	endTime = currentFrame.Timestamp
+
 	stopDetector()
 
 	if err := checkEventHandlerErr(); err != nil {
@@ -223,7 +225,7 @@ func processReplayFile(filename, outputFormat string) error {
 
 	// Output summary if requested
 	if outputFormat == "summary" {
-		outputSummary(eventStats, frameCount, startTime, endTime, filename)
+		outputSummary(eventStats, frameCount, startTime.AsTime(), endTime.AsTime(), filename)
 	}
 
 	return nil

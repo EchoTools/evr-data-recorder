@@ -42,16 +42,11 @@ the HTTP API at the configured frequency, storing output to files.`,
 	cmd.Flags().String("output", "output", "Output directory")
 
 	// Stream options
-	cmd.Flags().Bool("stream", false, "Enable streaming to Nakama server")
-	cmd.Flags().String("stream-http", "https://g.echovrce.com:7350", "Stream HTTP URL")
-	cmd.Flags().String("stream-socket", "wss://g.echovrce.com:7350/ws", "Stream WebSocket URL")
-	cmd.Flags().String("stream-http-key", "", "Stream HTTP key")
-	cmd.Flags().String("stream-server-key", "", "Stream server key")
-	cmd.Flags().String("stream-username", "", "Stream username")
-	cmd.Flags().String("stream-password", "", "Stream password")
+	// (Removed)
 
 	// Events API options
 	cmd.Flags().Bool("events", false, "Enable sending frames to events API")
+	cmd.Flags().Bool("events-stream", false, "Enable streaming frames to events API via WebSocket")
 	cmd.Flags().String("events-url", "http://localhost:8081", "Base URL of the events API")
 	cmd.Flags().String("events-user-id", "", "Optional user ID header for events API")
 	cmd.Flags().String("events-node-id", "default-node", "Node ID header for events API")
@@ -67,10 +62,6 @@ func runAgent(cmd *cobra.Command, args []string) error {
 	cfg.Agent.Frequency = viper.GetInt("frequency")
 	cfg.Agent.Format = viper.GetString("format")
 	cfg.Agent.OutputDirectory = viper.GetString("output")
-	cfg.Agent.StreamEnabled = viper.GetBool("stream")
-	cfg.Agent.StreamHTTPURL = viper.GetString("stream-http")
-	cfg.Agent.StreamSocketURL = viper.GetString("stream-socket")
-	cfg.Agent.StreamServerKey = viper.GetString("stream-server-key")
 	cfg.Agent.EventsEnabled = viper.GetBool("events")
 	cfg.Agent.EventsURL = viper.GetString("events-url")
 
@@ -199,13 +190,6 @@ OuterLoop:
 
 				// Create the appropriate file writer based on format
 				formats := strings.Split(cfg.Agent.Format, ",")
-				hasStreamFormat := false
-				for _, format := range formats {
-					if strings.TrimSpace(format) == "stream" {
-						hasStreamFormat = true
-						break
-					}
-				}
 
 				if len(formats) > 1 {
 					// Create multi-writer
@@ -214,17 +198,6 @@ OuterLoop:
 						format = strings.TrimSpace(format)
 						var fw agent.FrameWriter
 						switch format {
-						/*
-							case "stream":
-								rtapiWriter := agent.NewStreamWriter(logger, cfg.Agent.StreamHTTPURL, cfg.Agent.StreamSocketURL,
-									cfg.Agent.StreamHTTPKey, cfg.Agent.StreamServerKey, cfg.Agent.StreamUsername, cfg.Agent.StreamPassword)
-								if err := rtapiWriter.Connect(); err != nil {
-									logger.Error("Failed to connect stream writer", zap.Error(err))
-									continue
-								}
-								logger.Info("Stream writer connected successfully")
-								fw = rtapiWriter
-						*/
 						case "replay":
 							fallthrough
 						default:
@@ -239,17 +212,6 @@ OuterLoop:
 					fileWriter = agent.NewMultiWriter(logger, writers...)
 				} else {
 					switch formats[0] {
-					/*
-						case "stream":
-							rtapiWriter := agent.NewStreamWriter(logger, cfg.Agent.StreamHTTPURL, cfg.Agent.StreamSocketURL,
-								cfg.Agent.StreamHTTPKey, cfg.Agent.StreamServerKey, cfg.Agent.StreamUsername, cfg.Agent.StreamPassword)
-							if err := rtapiWriter.Connect(); err != nil {
-								logger.Error("Failed to connect stream writer", zap.Error(err))
-								continue
-							}
-							logger.Info("Stream writer connected successfully")
-							fileWriter = rtapiWriter
-					*/
 					case "replay":
 						fallthrough
 					default:
@@ -265,32 +227,37 @@ OuterLoop:
 
 				var session agent.FrameWriter = fileWriter
 
-				// If streaming is enabled via flag (and not already in format list), add stream writer
-				if cfg.Agent.StreamEnabled && !hasStreamFormat {
-					/*
-						streamWriter := agent.NewStreamWriter(logger, cfg.Agent.StreamHTTPURL, cfg.Agent.StreamSocketURL,
-							cfg.Agent.StreamHTTPKey, cfg.Agent.StreamServerKey, cfg.Agent.StreamUsername, cfg.Agent.StreamPassword)
-						if err := streamWriter.Connect(); err != nil {
-							logger.Error("Failed to connect stream writer", zap.Error(err))
-						} else {
-							logger.Info("Stream writer connected successfully")
-							session = agent.NewMultiWriter(logger, fileWriter, streamWriter)
-						}
-					*/
-				}
-
 				// If events sending is enabled, add EventsAPI writer
 				if cfg.Agent.EventsEnabled {
 					eventsWriter := agent.NewEventsAPIWriter(logger, cfg.Agent.EventsURL, cfg.Agent.JWTToken)
 					session = agent.NewMultiWriter(logger, session, eventsWriter)
+				}
+				// If events streaming is enabled, add WebSocket writer
+				if viper.GetBool("events-stream") {
+					// Derive WebSocket URL from Events URL if not explicitly set
+					wsURL := cfg.Agent.EventsURL
+					if strings.HasPrefix(wsURL, "http") {
+						wsURL = strings.Replace(wsURL, "http", "ws", 1)
+					}
+					wsURL = strings.TrimSuffix(wsURL, "/") + "/v3/stream"
+
+					nodeID := viper.GetString("events-node-id")
+					userID := viper.GetString("events-user-id")
+
+					wsWriter := agent.NewWebSocketWriter(logger, wsURL, cfg.Agent.JWTToken, nodeID, userID)
+					if err := wsWriter.Connect(); err != nil {
+						logger.Error("Failed to connect WebSocket writer", zap.Error(err))
+					} else {
+						logger.Info("WebSocket writer connected successfully", zap.String("url", wsURL))
+						session = agent.NewMultiWriter(logger, session, wsWriter)
+					}
 				}
 
 				sessions[baseURL] = session
 				go agent.NewHTTPFramePoller(session.Context(), logger, client, baseURL, interval, session)
 
 				logger.Info("Added new frame client",
-					zap.String("file_path", outputPath),
-					zap.Bool("streaming_enabled", cfg.Agent.StreamEnabled))
+					zap.String("file_path", outputPath))
 			}
 		}
 

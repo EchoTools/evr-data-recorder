@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/echotools/nevr-agent/v4/internal/api"
-	"github.com/echotools/nevr-common/v4/gen/go/telemetry/v1"
+	telemetry "github.com/echotools/nevr-common/v4/gen/go/telemetry/v1"
 	"github.com/echotools/nevrcap/v3/pkg/codecs"
 	"github.com/echotools/nevrcap/v3/pkg/events"
 	"github.com/echotools/nevrcap/v3/pkg/processing"

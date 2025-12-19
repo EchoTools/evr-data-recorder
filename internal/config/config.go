@@ -41,12 +41,6 @@ type AgentConfig struct {
 	// JWT token for API authentication (used for both stream and events APIs)
 	JWTToken string `yaml:"jwt_token" mapstructure:"jwt_token"`
 
-	// Stream configuration
-	StreamEnabled   bool   `yaml:"stream_enabled" mapstructure:"stream_enabled"`
-	StreamHTTPURL   string `yaml:"stream_http_url" mapstructure:"stream_http_url"`
-	StreamSocketURL string `yaml:"stream_socket_url" mapstructure:"stream_socket_url"`
-	StreamServerKey string `yaml:"stream_server_key" mapstructure:"stream_server_key"`
-
 	// Events API configuration
 	EventsEnabled bool   `yaml:"events_enabled" mapstructure:"events_enabled"`
 	EventsURL     string `yaml:"events_url" mapstructure:"events_url"`
@@ -86,9 +80,6 @@ func DefaultConfig() *Config {
 			Frequency:       10,
 			Format:          "nevrcap",
 			OutputDirectory: "output",
-			StreamHTTPURL:   "https://g.echovrce.com:7350",
-			StreamSocketURL: "wss://g.echovrce.com:7350/ws",
-			StreamServerKey: "",
 			EventsURL:       "http://localhost:8081",
 		},
 		APIServer: APIServerConfig{
