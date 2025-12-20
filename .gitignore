@@ -37,3 +37,4 @@ agent.log
 /agent.exe
 /validator
 output/
+recordings/
