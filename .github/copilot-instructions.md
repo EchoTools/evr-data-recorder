@@ -40,6 +40,12 @@ Example commit breakdown for a feature:
 cmd/agent/           # CLI commands (cobra-based)
 internal/agent/      # Core agent logic (writers, pollers)
 internal/api/        # HTTP API server implementation
+  ├── service.go         # Main API service
+  ├── storage_manager.go # Nevrcap file storage with retention
+  ├── match_retrieval.go # Match download API
+  ├── metrics.go         # Prometheus metrics
+  ├── player_lookup.go   # Player info lookup with caching
+  └── stream_api.go      # Real-time WebSocket streaming
 internal/config/     # Configuration loading and validation
 internal/amqp/       # AMQP/RabbitMQ integration
 ```
@@ -173,6 +179,8 @@ The hook runs:
 - **gorilla/mux**: HTTP routing
 - **gorilla/websocket**: WebSocket connections
 - **mongo-driver**: MongoDB client
+- **prometheus/client_golang**: Prometheus metrics
+- **schollz/progressbar**: Terminal progress bars
 
 ### Related Repositories
 

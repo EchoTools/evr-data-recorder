@@ -14,6 +14,16 @@ agent:
   format: nevrcap,stream
   output_directory: ./output
   
+  # Frame filtering options
+  all_frames: false           # Send all frames, not just event frames
+  fps: 0                      # Target FPS (0 = use polling frequency)
+  idle_fps: 1                 # FPS for non-gametime frames
+  exclude_bones: false        # Exclude player bone data
+  active_only: false          # Only stream during active gameplay
+  exclude_paused: false       # Exclude paused frames (with active_only)
+  include_modes: []           # Only stream these game modes
+  exclude_modes: []           # Exclude these game modes
+  
   # Stream configuration (optional)
   stream_enabled: false
   stream_http_url: https://g.echovrce.com:7350
@@ -34,6 +44,15 @@ apiserver:
   server_address: ":8081"
   mongo_uri: mongodb://localhost:27017
   jwt_secret: "your-secret-key-here-change-this-in-production"
+  max_stream_hz: 60
+  
+  # Capture storage configuration
+  capture_dir: "./captures"
+  capture_retention: "168h"      # 7 days
+  capture_max_size: 10737418240  # 10GB in bytes
+  
+  # Metrics configuration (leave empty to disable)
+  metrics_addr: ""              # e.g., ":9090" to enable Prometheus metrics
 
 # Converter configuration
 converter:
@@ -43,6 +62,7 @@ converter:
   format: auto
   verbose: false
   overwrite: false
+  progress: false               # Show progress bar during conversion
 
 # Replayer configuration
 replayer:

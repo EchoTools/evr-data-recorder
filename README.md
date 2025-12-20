@@ -5,8 +5,16 @@ nevr-agent is a single CLI binary (`agent`) for recording, converting, and repla
 ## Features
 
 - **Agent**: Record session and player bone data from EchoVR game servers via HTTP API polling
+  - Advanced frame filtering (FPS control, game mode filtering, active-only mode)
+  - Bone data exclusion to reduce payload size
+  - Idle/active FPS switching for bandwidth optimization
 - **API Server**: HTTP server for storing and retrieving session event data with MongoDB backend
+  - Capture storage management with retention policies and size limits
+  - Real-time WebSocket streaming API with seek/rewind support
+  - Prometheus metrics endpoint
+  - Player lookup integration with caching
 - **Converter**: Convert between .echoreplay (zip) and .nevrcap (zstd compressed) file formats
+  - Progress bar support for large file conversions
 - **Replayer**: HTTP server for replaying recorded session data
 
 ## Prerequisites
@@ -60,7 +68,29 @@ agent stream --stream --stream-username myuser --stream-password mypass 127.0.0.
 
 # Record with Events API enabled
 agent stream --events --events-url http://localhost:8081 127.0.0.1:6721-6730
+
+# Stream all frames at 30 FPS, excluding bone data for smaller payloads
+agent stream --all-frames --fps 30 --exclude-bones 127.0.0.1:6721
+
+# Only stream Echo Arena matches during active gameplay
+agent stream --include-modes echo_arena --active-only 127.0.0.1:6721
+
+# Reduce bandwidth with idle FPS (1 FPS in lobby, 30 FPS during gameplay)
+agent stream --fps 30 --idle-fps 1 --active-only 127.0.0.1:6721-6730
 ```
+
+#### Stream Filtering Options
+
+| Flag | Description |
+|------|-------------|
+| `--all-frames` | Send all frames, not just frames with events |
+| `--fps <n>` | Target frames per second (0 = use polling frequency) |
+| `--idle-fps <n>` | Frame rate for non-gametime frames (default: 1) |
+| `--include-modes` | Only stream these game modes (comma-separated) |
+| `--exclude-modes` | Exclude these game modes from streaming |
+| `--exclude-bones` | Exclude player bone data to reduce payload size |
+| `--active-only` | Only stream frames during active gameplay |
+| `--exclude-paused` | Exclude paused frames (with `--active-only`) |
 
 ### API Server - Session Events API
 
@@ -72,7 +102,31 @@ agent serve
 
 # Custom MongoDB URI and port
 agent serve --mongo-uri mongodb://localhost:27017 --server-address :8081
+
+# Enable capture storage with retention (7 days, max 10GB)
+agent serve --capture-dir ./captures --capture-retention 168h --capture-max-size 10737418240
+
+# Enable Prometheus metrics on port 9090
+agent serve --metrics-addr :9090
+
+# Full production setup
+agent serve \
+  --mongo-uri mongodb://localhost:27017 \
+  --capture-dir ./captures \
+  --capture-retention 168h \
+  --metrics-addr :9090 \
+  --jwt-secret "your-secret-key"
 ```
+
+#### API Server Features
+
+- **Capture Storage**: Automatically stores match recordings with configurable retention and size limits
+- **Match Retrieval**: Download completed matches via REST API with format conversion
+- **Real-time Streaming**: WebSocket API for live match data with seek/rewind support
+- **Prometheus Metrics**: `/metrics` endpoint for monitoring frames, matches, connections, and storage
+- **Player Lookup**: Integration with echovrce API for player information with LRU caching
+
+See [docs/WEBSOCKET_STREAM.md](docs/WEBSOCKET_STREAM.md) for WebSocket API details.
 
 ### Converter - Format Conversion
 
@@ -87,6 +141,9 @@ agent convert --input game.nevrcap --output converted.echoreplay
 
 # Force specific format
 agent convert --input game.echoreplay --format nevrcap
+
+# Show progress bar for large files
+agent convert --input large_game.echoreplay --progress
 ```
 
 ### Replayer - Replay Sessions
