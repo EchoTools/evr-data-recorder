@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/echotools/nevr-common/v4 v4.0.0
-	github.com/echotools/nevr-capture/v3 v3.0.0-local
+	github.com/echotools/nevr-capture/v3 v3.2.0
 	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/google/go-cmp v0.7.0
 	github.com/gorilla/mux v1.8.1
