@@ -37,6 +37,20 @@ type SessionFrameDocument struct {
 
 // LobbySession resolves the lobbySession query
 func (r *Resolver) LobbySession(ctx context.Context, id string) (*LobbySession, error) {
+	// Basic validation of the lobby session ID to avoid using arbitrary user-controlled values in queries
+	if len(id) == 0 || len(id) > 128 {
+		return nil, fmt.Errorf("invalid lobby session id")
+	}
+	for i := 0; i < len(id); i++ {
+		c := id[i]
+		if !((c >= 'a' && c <= 'z') ||
+			(c >= 'A' && c <= 'Z') ||
+			(c >= '0' && c <= '9') ||
+			c == '-' || c == '_') {
+			return nil, fmt.Errorf("invalid lobby session id")
+		}
+	}
+
 	collection := r.MongoClient.Database(sessionEventDatabaseName).Collection(sessionEventCollectionName)
 
 	// Check if any events exist for this session
