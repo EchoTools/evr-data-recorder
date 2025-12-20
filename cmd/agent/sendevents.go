@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/echotools/nevr-agent/v4/internal/api"
+	"github.com/echotools/nevr-capture/v3/pkg/codecs"
+	"github.com/echotools/nevr-capture/v3/pkg/events"
+	"github.com/echotools/nevr-capture/v3/pkg/processing"
 	telemetry "github.com/echotools/nevr-common/v4/gen/go/telemetry/v1"
-	"github.com/echotools/nevrcap/v3/pkg/codecs"
-	"github.com/echotools/nevrcap/v3/pkg/events"
-	"github.com/echotools/nevrcap/v3/pkg/processing"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"

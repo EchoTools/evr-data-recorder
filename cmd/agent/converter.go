@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/echotools/nevrcap/v3/pkg/codecs"
-	"github.com/echotools/nevrcap/v3/pkg/conversion"
+	"github.com/echotools/nevr-capture/v3/pkg/codecs"
+	"github.com/echotools/nevr-capture/v3/pkg/conversion"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"

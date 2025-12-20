@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/echotools/nevr-capture/v3/pkg/codecs"
+	"github.com/echotools/nevr-capture/v3/pkg/processing"
 	telemetry "github.com/echotools/nevr-common/v4/gen/go/telemetry/v1"
-	"github.com/echotools/nevrcap/v3/pkg/codecs"
-	"github.com/echotools/nevrcap/v3/pkg/processing"
 	"github.com/klauspost/compress/zstd"
 	"github.com/spf13/cobra"
 	"google.golang.org/protobuf/proto"

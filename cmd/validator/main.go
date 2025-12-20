@@ -17,9 +17,9 @@ import (
 	"path/filepath"
 	"reflect"
 
+	"github.com/echotools/nevr-capture/v3/pkg/codecs"
 	"github.com/echotools/nevr-common/v4/gen/go/apigame"
 	"github.com/echotools/nevr-common/v4/gen/go/telemetry/v1"
-	"github.com/echotools/nevrcap/v3/pkg/codecs"
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/encoding/protojson"
 )

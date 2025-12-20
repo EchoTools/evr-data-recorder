@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/echotools/nevrcap/v3/pkg/events"
-	"github.com/echotools/nevrcap/v3/pkg/processing"
+	"github.com/echotools/nevr-capture/v3/pkg/events"
+	"github.com/echotools/nevr-capture/v3/pkg/processing"
 	"go.uber.org/zap"
 )
 
