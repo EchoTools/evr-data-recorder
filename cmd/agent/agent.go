@@ -15,59 +15,80 @@ import (
 
 	"github.com/echotools/nevr-agent/v4/internal/agent"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
 
 func newAgentCommand() *cobra.Command {
+	var (
+		frequency    int
+		format       string
+		outputDir    string
+		events       bool
+		eventsStream bool
+		eventsURL    string
+		eventsUserID string
+		eventsNodeID string
+	)
+
 	cmd := &cobra.Command{
-		Use:   "stream [host:port[-endPort]] [host:port[-endPort]...]",
+		Use:   "stream [flags] <host:port[-endPort]> [host:port[-endPort]...]",
 		Short: "Record session and player bone data from EchoVR game servers",
 		Long: `The stream command regularly scans specified ports and starts polling 
-the HTTP API at the configured frequency, storing output to files.`,
-		Example: `  # Record from ports 6721-6730 on localhost at 30Hz
-	  agent stream --frequency 30 --output ./output 127.0.0.1:6721-6730
+the HTTP API at the configured frequency, storing output to files.
 
-  # Record with streaming enabled
-	  agent stream --stream --stream-username myuser 127.0.0.1:6721-6730
+Targets are specified as host:port or host:startPort-endPort for port ranges.`,
+		Example: `  # Record from ports 6721-6730 on localhost at 30Hz
+  agent stream --frequency 30 --output ./output 127.0.0.1:6721-6730
+
+  # Stream to events API without saving files locally
+  agent stream --format none --events-stream --events-url http://localhost:8081 127.0.0.1:6721
 
   # Use a config file
-	  agent stream -c config.yaml 127.0.0.1:6721`,
-		RunE: runAgent,
+  agent stream -c config.yaml 127.0.0.1:6721`,
+		Args: cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runAgent(cmd, args, frequency, format, outputDir, events, eventsStream, eventsURL, eventsUserID, eventsNodeID)
+		},
 	}
 
 	// Agent-specific flags
-	cmd.Flags().Int("frequency", 10, "Polling frequency in Hz")
-	cmd.Flags().String("format", "replay", "Output format (replay, stream, or comma-separated)")
-	cmd.Flags().String("output", "output", "Output directory")
-
-	// Stream options
-	// (Removed)
+	cmd.Flags().IntVarP(&frequency, "frequency", "f", 10, "Polling frequency in Hz")
+	cmd.Flags().StringVar(&format, "format", "replay", "Output format (replay, none, or comma-separated)")
+	cmd.Flags().StringVarP(&outputDir, "output", "o", "output", "Output directory for recorded files")
 
 	// Events API options
-	cmd.Flags().Bool("events", false, "Enable sending frames to events API")
-	cmd.Flags().Bool("events-stream", false, "Enable streaming frames to events API via WebSocket")
-	cmd.Flags().String("events-url", "http://localhost:8081", "Base URL of the events API")
-	cmd.Flags().String("events-user-id", "", "Optional user ID header for events API")
-	cmd.Flags().String("events-node-id", "default-node", "Node ID header for events API")
-
-	// Bind flags to viper
-	viper.BindPFlags(cmd.Flags())
+	cmd.Flags().BoolVar(&events, "events", false, "Enable sending frames to events API")
+	cmd.Flags().BoolVar(&eventsStream, "events-stream", false, "Enable streaming frames to events API via WebSocket")
+	cmd.Flags().StringVar(&eventsURL, "events-url", "http://localhost:8081", "Base URL of the events API")
+	cmd.Flags().StringVar(&eventsUserID, "events-user-id", "", "Optional user ID header for events API")
+	cmd.Flags().StringVar(&eventsNodeID, "events-node-id", "default-node", "Node ID header for events API")
 
 	return cmd
 }
 
-func runAgent(cmd *cobra.Command, args []string) error {
+func runAgent(cmd *cobra.Command, args []string, frequency int, format, outputDir string, events, eventsStream bool, eventsURL, eventsUserID, eventsNodeID string) error {
 	// Override config with command flags
-	cfg.Agent.Frequency = viper.GetInt("frequency")
-	cfg.Agent.Format = viper.GetString("format")
-	cfg.Agent.OutputDirectory = viper.GetString("output")
-	cfg.Agent.EventsEnabled = viper.GetBool("events")
-	cfg.Agent.EventsURL = viper.GetString("events-url")
+	cfg.Agent.Frequency = frequency
+	cfg.Agent.Format = format
+	cfg.Agent.OutputDirectory = outputDir
+	cfg.Agent.EventsEnabled = events
+	cfg.Agent.EventsURL = eventsURL
 
-	// Parse targets from arguments
-	if len(args) == 0 {
-		return fmt.Errorf("at least one host:port target must be specified")
+	// If only streaming to events API, we don't need file output
+	if eventsStream || events {
+		// Check if any file format is specified
+		hasFileFormat := false
+		for _, f := range strings.Split(format, ",") {
+			f = strings.TrimSpace(f)
+			if f != "" && f != "none" {
+				hasFileFormat = true
+				break
+			}
+		}
+		if !hasFileFormat {
+			// Override format to "none" to skip file output validation
+			cfg.Agent.Format = "none"
+		}
 	}
 
 	targets := make(map[string][]int)
@@ -97,7 +118,7 @@ func runAgent(cmd *cobra.Command, args []string) error {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
-	go startAgent(ctx, logger, targets)
+	go startAgent(ctx, logger, targets, eventsStream, eventsURL, eventsUserID, eventsNodeID)
 
 	select {
 	case <-ctx.Done():
@@ -112,7 +133,7 @@ func runAgent(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func startAgent(ctx context.Context, logger *zap.Logger, targets map[string][]int) {
+func startAgent(ctx context.Context, logger *zap.Logger, targets map[string][]int, eventsStreamEnabled bool, eventsURL, eventsUserID, eventsNodeID string) {
 	client := &http.Client{
 		Timeout: 3 * time.Second,
 		Transport: &http.Transport{
@@ -217,22 +238,19 @@ OuterLoop:
 
 				// If events sending is enabled, add EventsAPI writer
 				if cfg.Agent.EventsEnabled {
-					eventsWriter := agent.NewEventsAPIWriter(logger, cfg.Agent.EventsURL, cfg.Agent.JWTToken)
+					eventsWriter := agent.NewEventsAPIWriter(logger, eventsURL, cfg.Agent.JWTToken)
 					writers = append(writers, eventsWriter)
 				}
 				// If events streaming is enabled, add WebSocket writer
-				if viper.GetBool("events-stream") {
+				if eventsStreamEnabled {
 					// Derive WebSocket URL from Events URL if not explicitly set
-					wsURL := cfg.Agent.EventsURL
+					wsURL := eventsURL
 					if strings.HasPrefix(wsURL, "http") {
 						wsURL = strings.Replace(wsURL, "http", "ws", 1)
 					}
 					wsURL = strings.TrimSuffix(wsURL, "/") + "/v3/stream"
 
-					nodeID := viper.GetString("events-node-id")
-					userID := viper.GetString("events-user-id")
-
-					wsWriter := agent.NewWebSocketWriter(logger, wsURL, cfg.Agent.JWTToken, nodeID, userID)
+					wsWriter := agent.NewWebSocketWriter(logger, wsURL, cfg.Agent.JWTToken, eventsNodeID, eventsUserID)
 					if err := wsWriter.Connect(); err != nil {
 						logger.Error("Failed to connect WebSocket writer", zap.Error(err))
 					} else {
