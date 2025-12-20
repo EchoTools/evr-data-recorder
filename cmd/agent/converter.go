@@ -10,6 +10,7 @@ import (
 
 	"github.com/echotools/nevr-capture/v3/pkg/codecs"
 	"github.com/echotools/nevr-capture/v3/pkg/conversion"
+	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -31,7 +32,10 @@ func newConverterCommand() *cobra.Command {
 	  agent convert --input game.echoreplay --format nevrcap
 
   # Specify output file
-	  agent convert --input game.nevrcap --output converted.echoreplay`,
+	  agent convert --input game.nevrcap --output converted.echoreplay
+	  
+  # Show progress bar during conversion
+	  agent convert --input game.echoreplay --progress`,
 		RunE: runConverter,
 	}
 
@@ -42,6 +46,7 @@ func newConverterCommand() *cobra.Command {
 	cmd.Flags().StringP("format", "f", "auto", "Output format: auto, echoreplay, nevrcap")
 	cmd.Flags().BoolP("verbose", "v", false, "Enable verbose logging")
 	cmd.Flags().Bool("overwrite", false, "Overwrite existing output files")
+	cmd.Flags().BoolP("progress", "p", false, "Show progress bar during conversion")
 
 	cmd.MarkFlagRequired("input")
 
@@ -59,6 +64,7 @@ func runConverter(cmd *cobra.Command, args []string) error {
 	cfg.Converter.Format = viper.GetString("format")
 	cfg.Converter.Verbose = viper.GetBool("verbose")
 	cfg.Converter.Overwrite = viper.GetBool("overwrite")
+	showProgress := viper.GetBool("progress")
 
 	// Validate configuration
 	if err := cfg.ValidateConverterConfig(); err != nil {
@@ -90,7 +96,7 @@ func runConverter(cmd *cobra.Command, args []string) error {
 	}
 
 	// Perform conversion
-	stats, err := convertFile(cfg.Converter.InputFile, outputFile)
+	stats, err := convertFile(cfg.Converter.InputFile, outputFile, showProgress)
 	if err != nil {
 		return fmt.Errorf("conversion failed: %w", err)
 	}
@@ -166,7 +172,7 @@ func determineOutputFile() (string, error) {
 	return filepath.Join(cfg.Converter.OutputDir, outputName), nil
 }
 
-func convertFile(inputFile, outputFile string) (*ConversionStats, error) {
+func convertFile(inputFile, outputFile string, showProgress bool) (*ConversionStats, error) {
 	stats := &ConversionStats{}
 
 	// Get input file size
@@ -184,14 +190,26 @@ func convertFile(inputFile, outputFile string) (*ConversionStats, error) {
 			zap.String("to", outputFormat))
 	}
 
-	// Perform conversion
+	// Perform conversion with progress support
 	if inputFormat == "echoreplay" && outputFormat == "nevrcap" {
-		if err := conversion.ConvertEchoReplayToNevrcap(inputFile, outputFile); err != nil {
-			return nil, err
+		if showProgress {
+			if err := convertEchoReplayToNevrcapWithProgress(inputFile, outputFile); err != nil {
+				return nil, err
+			}
+		} else {
+			if err := conversion.ConvertEchoReplayToNevrcap(inputFile, outputFile); err != nil {
+				return nil, err
+			}
 		}
 	} else if inputFormat == "nevrcap" && outputFormat == "echoreplay" {
-		if err := conversion.ConvertNevrcapToEchoReplay(inputFile, outputFile); err != nil {
-			return nil, err
+		if showProgress {
+			if err := convertNevrcapToEchoReplayWithProgress(inputFile, outputFile); err != nil {
+				return nil, err
+			}
+		} else {
+			if err := conversion.ConvertNevrcapToEchoReplay(inputFile, outputFile); err != nil {
+				return nil, err
+			}
 		}
 	} else if inputFormat == outputFormat {
 		// Same format, just copy
@@ -211,6 +229,139 @@ func convertFile(inputFile, outputFile string) (*ConversionStats, error) {
 	}
 
 	return stats, nil
+}
+
+// convertEchoReplayToNevrcapWithProgress converts with a progress bar
+func convertEchoReplayToNevrcapWithProgress(inputFile, outputFile string) error {
+	reader, err := codecs.NewEchoReplayReader(inputFile)
+	if err != nil {
+		return fmt.Errorf("failed to open input file: %w", err)
+	}
+	defer reader.Close()
+
+	writer, err := codecs.NewNevrCapWriter(outputFile)
+	if err != nil {
+		return fmt.Errorf("failed to create output file: %w", err)
+	}
+	defer writer.Close()
+
+	// Count total frames first for progress bar
+	totalFrames := 0
+	countReader, err := codecs.NewEchoReplayReader(inputFile)
+	if err == nil {
+		for countReader.HasNext() {
+			if _, err := countReader.ReadFrame(); err != nil {
+				break
+			}
+			totalFrames++
+		}
+		countReader.Close()
+	}
+
+	bar := progressbar.NewOptions(totalFrames,
+		progressbar.OptionEnableColorCodes(true),
+		progressbar.OptionShowBytes(false),
+		progressbar.OptionSetWidth(40),
+		progressbar.OptionSetDescription("[cyan]Converting[reset]"),
+		progressbar.OptionSetTheme(progressbar.Theme{
+			Saucer:        "[green]=[reset]",
+			SaucerHead:    "[green]>[reset]",
+			SaucerPadding: " ",
+			BarStart:      "[",
+			BarEnd:        "]",
+		}),
+		progressbar.OptionShowCount(),
+		progressbar.OptionShowElapsedTimeOnFinish(),
+	)
+
+	for reader.HasNext() {
+		frame, err := reader.ReadFrame()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return fmt.Errorf("failed to read frame: %w", err)
+		}
+
+		if err := writer.WriteFrame(frame); err != nil {
+			return fmt.Errorf("failed to write frame: %w", err)
+		}
+
+		bar.Add(1)
+	}
+
+	fmt.Println() // New line after progress bar
+	return nil
+}
+
+// convertNevrcapToEchoReplayWithProgress converts with a progress bar
+func convertNevrcapToEchoReplayWithProgress(inputFile, outputFile string) error {
+	reader, err := codecs.NewNevrCapReader(inputFile)
+	if err != nil {
+		return fmt.Errorf("failed to open input file: %w", err)
+	}
+	defer reader.Close()
+
+	// Skip header
+	if _, err := reader.ReadHeader(); err != nil {
+		return fmt.Errorf("failed to read header: %w", err)
+	}
+
+	writer, err := codecs.NewEchoReplayWriter(outputFile)
+	if err != nil {
+		return fmt.Errorf("failed to create output file: %w", err)
+	}
+	defer writer.Close()
+
+	// Count total frames first for progress bar
+	totalFrames := 0
+	countReader, err := codecs.NewNevrCapReader(inputFile)
+	if err == nil {
+		if _, err := countReader.ReadHeader(); err == nil {
+			for {
+				if _, err := countReader.ReadFrame(); err != nil {
+					break
+				}
+				totalFrames++
+			}
+		}
+		countReader.Close()
+	}
+
+	bar := progressbar.NewOptions(totalFrames,
+		progressbar.OptionEnableColorCodes(true),
+		progressbar.OptionShowBytes(false),
+		progressbar.OptionSetWidth(40),
+		progressbar.OptionSetDescription("[cyan]Converting[reset]"),
+		progressbar.OptionSetTheme(progressbar.Theme{
+			Saucer:        "[green]=[reset]",
+			SaucerHead:    "[green]>[reset]",
+			SaucerPadding: " ",
+			BarStart:      "[",
+			BarEnd:        "]",
+		}),
+		progressbar.OptionShowCount(),
+		progressbar.OptionShowElapsedTimeOnFinish(),
+	)
+
+	for {
+		frame, err := reader.ReadFrame()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return fmt.Errorf("failed to read frame: %w", err)
+		}
+
+		if err := writer.WriteFrame(frame); err != nil {
+			return fmt.Errorf("failed to write frame: %w", err)
+		}
+
+		bar.Add(1)
+	}
+
+	fmt.Println() // New line after progress bar
+	return nil
 }
 
 func getFileFormat(filename string) string {

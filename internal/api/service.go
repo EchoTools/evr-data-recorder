@@ -30,6 +30,17 @@ type Config struct {
 	AMQPQueueName string `json:"amqp_queue_name" yaml:"amqp_queue_name"`
 	AMQPEnabled   bool   `json:"amqp_enabled" yaml:"amqp_enabled"`
 
+	// Capture storage configuration
+	CaptureDir       string `json:"capture_dir" yaml:"capture_dir"`
+	CaptureRetention string `json:"capture_retention" yaml:"capture_retention"` // Duration string
+	CaptureMaxSize   int64  `json:"capture_max_size" yaml:"capture_max_size"`   // Max bytes
+
+	// Rate limiting
+	MaxStreamHz int `json:"max_stream_hz" yaml:"max_stream_hz"`
+
+	// Metrics
+	MetricsAddr string `json:"metrics_addr" yaml:"metrics_addr"`
+
 	// Optional timeouts
 	MongoTimeout  time.Duration `json:"mongo_timeout" yaml:"mongo_timeout"`
 	ServerTimeout time.Duration `json:"server_timeout" yaml:"server_timeout"`
@@ -58,16 +69,21 @@ func DefaultConfig() *Config {
 	jwtSecret := os.Getenv("EVR_APISERVER_JWT_SECRET")
 
 	return &Config{
-		MongoURI:       mongoURI,
-		DatabaseName:   sessionEventDatabaseName,
-		CollectionName: sessionEventCollectionName,
-		ServerAddress:  serverAddress,
-		JWTSecret:      jwtSecret,
-		AMQPURI:        amqpURI,
-		AMQPQueueName:  amqp.DefaultQueueName,
-		AMQPEnabled:    amqpEnabled,
-		MongoTimeout:   10 * time.Second,
-		ServerTimeout:  30 * time.Second,
+		MongoURI:         mongoURI,
+		DatabaseName:     sessionEventDatabaseName,
+		CollectionName:   sessionEventCollectionName,
+		ServerAddress:    serverAddress,
+		JWTSecret:        jwtSecret,
+		AMQPURI:          amqpURI,
+		AMQPQueueName:    amqp.DefaultQueueName,
+		AMQPEnabled:      amqpEnabled,
+		CaptureDir:       "./captures",
+		CaptureRetention: "168h",
+		CaptureMaxSize:   10 * 1024 * 1024 * 1024, // 10GB
+		MaxStreamHz:      60,
+		MetricsAddr:      "",
+		MongoTimeout:     10 * time.Second,
+		ServerTimeout:    30 * time.Second,
 	}
 }
 

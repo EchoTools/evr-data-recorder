@@ -51,6 +51,17 @@ type APIServerConfig struct {
 	ServerAddress string `yaml:"server_address" mapstructure:"server_address"`
 	MongoURI      string `yaml:"mongo_uri" mapstructure:"mongo_uri"`
 	JWTSecret     string `yaml:"jwt_secret" mapstructure:"jwt_secret"`
+
+	// Capture storage configuration
+	CaptureDir       string `yaml:"capture_dir" mapstructure:"capture_dir"`
+	CaptureRetention string `yaml:"capture_retention" mapstructure:"capture_retention"` // Duration string (e.g., "24h", "7d")
+	CaptureMaxSize   int64  `yaml:"capture_max_size" mapstructure:"capture_max_size"`   // Max storage in bytes
+
+	// Rate limiting
+	MaxStreamHz int `yaml:"max_stream_hz" mapstructure:"max_stream_hz"` // Max frames per second from clients
+
+	// Metrics
+	MetricsAddr string `yaml:"metrics_addr" mapstructure:"metrics_addr"` // Prometheus metrics endpoint address
 }
 
 // ConverterConfig holds configuration for the converter subcommand
@@ -83,9 +94,14 @@ func DefaultConfig() *Config {
 			EventsURL:       "http://localhost:8081",
 		},
 		APIServer: APIServerConfig{
-			ServerAddress: ":8081",
-			MongoURI:      "mongodb://localhost:27017",
-			JWTSecret:     "",
+			ServerAddress:    ":8081",
+			MongoURI:         "mongodb://localhost:27017",
+			JWTSecret:        "",
+			CaptureDir:       "./captures",
+			CaptureRetention: "168h",                  // 7 days
+			CaptureMaxSize:   10 * 1024 * 1024 * 1024, // 10GB
+			MaxStreamHz:      60,
+			MetricsAddr:      "",
 		},
 		Converter: ConverterConfig{
 			OutputDir: "./",

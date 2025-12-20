@@ -39,12 +39,19 @@ func newAPIServerCommand() *cobra.Command {
 		Use:   "serve",
 		Short: "Run the session events API server",
 		Long: `The serve command starts an HTTP server that provides endpoints 
-for storing and retrieving session event data.`,
+for storing and retrieving session event data, with optional capture storage
+and real-time streaming support.`,
 		Example: `  # Start API server on default port
 	agent serve
 
   # Start with custom MongoDB URI
 	agent serve --mongo-uri mongodb://localhost:27017
+
+  # Enable capture storage with retention
+	agent serve --capture-dir ./captures --capture-retention 168h
+
+  # Enable Prometheus metrics
+	agent serve --metrics-addr :9090
 
   # Use a config file
 	agent serve -c config.yaml`,
@@ -55,6 +62,17 @@ for storing and retrieving session event data.`,
 	cmd.Flags().String("server-address", ":8081", "Server listen address")
 	cmd.Flags().String("mongo-uri", "mongodb://localhost:27017", "MongoDB connection URI")
 	cmd.Flags().String("jwt-secret", "", "JWT secret key for token validation")
+
+	// Capture storage flags
+	cmd.Flags().String("capture-dir", "./captures", "Directory to store nevrcap capture files")
+	cmd.Flags().String("capture-retention", "168h", "How long to keep capture files (e.g., 24h, 7d)")
+	cmd.Flags().Int64("capture-max-size", 10*1024*1024*1024, "Maximum storage for captures in bytes")
+
+	// Rate limiting
+	cmd.Flags().Int("max-stream-hz", 60, "Maximum frames per second to accept from clients")
+
+	// Metrics
+	cmd.Flags().String("metrics-addr", "", "Prometheus metrics endpoint address (e.g., :9090)")
 
 	// Bind flags to viper
 	viper.BindPFlags(cmd.Flags())
@@ -67,6 +85,11 @@ func runAPIServer(cmd *cobra.Command, args []string) error {
 	cfg.APIServer.ServerAddress = viper.GetString("server-address")
 	cfg.APIServer.MongoURI = viper.GetString("mongo-uri")
 	cfg.APIServer.JWTSecret = viper.GetString("jwt-secret")
+	cfg.APIServer.CaptureDir = viper.GetString("capture-dir")
+	cfg.APIServer.CaptureRetention = viper.GetString("capture-retention")
+	cfg.APIServer.CaptureMaxSize = viper.GetInt64("capture-max-size")
+	cfg.APIServer.MaxStreamHz = viper.GetInt("max-stream-hz")
+	cfg.APIServer.MetricsAddr = viper.GetString("metrics-addr")
 
 	// Validate configuration
 	if err := cfg.ValidateAPIServerConfig(); err != nil {
@@ -75,13 +98,23 @@ func runAPIServer(cmd *cobra.Command, args []string) error {
 
 	logger.Info("Starting API server",
 		zap.String("server_address", cfg.APIServer.ServerAddress),
-		zap.String("mongo_uri", cfg.APIServer.MongoURI))
+		zap.String("mongo_uri", cfg.APIServer.MongoURI),
+		zap.String("capture_dir", cfg.APIServer.CaptureDir),
+		zap.String("capture_retention", cfg.APIServer.CaptureRetention),
+		zap.Int64("capture_max_size", cfg.APIServer.CaptureMaxSize),
+		zap.Int("max_stream_hz", cfg.APIServer.MaxStreamHz),
+		zap.String("metrics_addr", cfg.APIServer.MetricsAddr))
 
 	// Create service configuration
 	serviceConfig := api.DefaultConfig()
 	serviceConfig.MongoURI = cfg.APIServer.MongoURI
 	serviceConfig.ServerAddress = cfg.APIServer.ServerAddress
 	serviceConfig.JWTSecret = cfg.APIServer.JWTSecret
+	serviceConfig.CaptureDir = cfg.APIServer.CaptureDir
+	serviceConfig.CaptureRetention = cfg.APIServer.CaptureRetention
+	serviceConfig.CaptureMaxSize = cfg.APIServer.CaptureMaxSize
+	serviceConfig.MaxStreamHz = cfg.APIServer.MaxStreamHz
+	serviceConfig.MetricsAddr = cfg.APIServer.MetricsAddr
 
 	// Create service
 	service, err := api.NewService(serviceConfig, &zapLoggerAdapter{logger: logger})

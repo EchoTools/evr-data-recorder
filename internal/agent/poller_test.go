@@ -68,7 +68,7 @@ func BenchmarkNewFrameLogger_TwoURLs_32KB_MaxPollingRate(b *testing.B) {
 		frames: make([]*telemetry.LobbySessionStateFrame, 0, b.N*2), // Preallocate space for frames
 	}
 
-	NewHTTPFramePoller(ctx, testLogger, http.DefaultClient, srv1.URL, interval, benchWriter)
+	NewHTTPFramePoller(ctx, testLogger, http.DefaultClient, srv1.URL, interval, benchWriter, PollerConfig{})
 
 	b.Logf("Warmed up channel, ready for benchmark with %d frames", b.N)
 

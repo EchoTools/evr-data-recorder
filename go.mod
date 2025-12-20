@@ -4,20 +4,23 @@ go 1.25.0
 
 require (
 	github.com/echotools/nevr-common/v4 v4.0.0
-	github.com/echotools/nevr-capture/v3 v3.0.0
+	github.com/echotools/nevr-capture/v3 v3.0.0-local
 	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/google/go-cmp v0.7.0
 	github.com/gorilla/mux v1.8.1
 	github.com/joho/godotenv v1.5.1
 	github.com/klauspost/compress v1.18.1
+	github.com/prometheus/client_golang v1.20.5
 	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/rs/cors v1.11.1
+	github.com/schollz/progressbar/v3 v3.17.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	go.mongodb.org/mongo-driver v1.17.6
 	go.uber.org/zap v1.27.0
 	google.golang.org/protobuf v1.36.10
 )
+
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect

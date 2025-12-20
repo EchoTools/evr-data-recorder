@@ -18,16 +18,44 @@ import (
 	"go.uber.org/zap"
 )
 
+// StreamConfig holds configuration for the stream command
+type StreamConfig struct {
+	Frequency     int
+	Format        string
+	OutputDir     string
+	Events        bool
+	EventsStream  bool
+	EventsURL     string
+	EventsUserID  string
+	EventsNodeID  string
+	AllFrames     bool     // Send all frames, not just event frames
+	FPS           int      // Target frames per second for streaming
+	IncludeModes  []string // Only stream these game modes
+	ExcludeModes  []string // Exclude these game modes from streaming
+	ExcludeBones  bool     // Exclude player bone data
+	ActiveOnly    bool     // Only stream frames during active gameplay
+	ExcludePaused bool     // Exclude paused frames (only with ActiveOnly)
+	IdleFPS       int      // Frame rate for non-gametime frames
+}
+
 func newAgentCommand() *cobra.Command {
 	var (
-		frequency    int
-		format       string
-		outputDir    string
-		events       bool
-		eventsStream bool
-		eventsURL    string
-		eventsUserID string
-		eventsNodeID string
+		frequency     int
+		format        string
+		outputDir     string
+		events        bool
+		eventsStream  bool
+		eventsURL     string
+		eventsUserID  string
+		eventsNodeID  string
+		allFrames     bool
+		fps           int
+		includeModes  []string
+		excludeModes  []string
+		excludeBones  bool
+		activeOnly    bool
+		excludePaused bool
+		idleFPS       int
 	)
 
 	cmd := &cobra.Command{
@@ -44,10 +72,34 @@ Targets are specified as host:port or host:startPort-endPort for port ranges.`,
   agent stream --format none --events-stream --events-url http://localhost:8081 127.0.0.1:6721
 
   # Use a config file
-  agent stream -c config.yaml 127.0.0.1:6721`,
+  agent stream -c config.yaml 127.0.0.1:6721
+
+  # Stream all frames at 30 FPS, excluding bone data
+  agent stream --all-frames --fps 30 --exclude-bones 127.0.0.1:6721
+
+  # Only stream Echo Arena matches during active gameplay
+  agent stream --include-modes echo_arena --active-only 127.0.0.1:6721`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runAgent(cmd, args, frequency, format, outputDir, events, eventsStream, eventsURL, eventsUserID, eventsNodeID)
+			streamCfg := StreamConfig{
+				Frequency:     frequency,
+				Format:        format,
+				OutputDir:     outputDir,
+				Events:        events,
+				EventsStream:  eventsStream,
+				EventsURL:     eventsURL,
+				EventsUserID:  eventsUserID,
+				EventsNodeID:  eventsNodeID,
+				AllFrames:     allFrames,
+				FPS:           fps,
+				IncludeModes:  includeModes,
+				ExcludeModes:  excludeModes,
+				ExcludeBones:  excludeBones,
+				ActiveOnly:    activeOnly,
+				ExcludePaused: excludePaused,
+				IdleFPS:       idleFPS,
+			}
+			return runAgent(cmd, args, streamCfg)
 		},
 	}
 
@@ -63,22 +115,32 @@ Targets are specified as host:port or host:startPort-endPort for port ranges.`,
 	cmd.Flags().StringVar(&eventsUserID, "events-user-id", "", "Optional user ID header for events API")
 	cmd.Flags().StringVar(&eventsNodeID, "events-node-id", "default-node", "Node ID header for events API")
 
+	// Stream filtering options
+	cmd.Flags().BoolVar(&allFrames, "all-frames", false, "Send all frames, not just frames with events")
+	cmd.Flags().IntVar(&fps, "fps", 0, "Target frames per second for streaming (0 = use polling frequency)")
+	cmd.Flags().StringSliceVar(&includeModes, "include-modes", nil, "Only stream these game modes (e.g., echo_arena,echo_arena_private)")
+	cmd.Flags().StringSliceVar(&excludeModes, "exclude-modes", nil, "Exclude these game modes from streaming")
+	cmd.Flags().BoolVar(&excludeBones, "exclude-bones", false, "Exclude player bone data from frames")
+	cmd.Flags().BoolVar(&activeOnly, "active-only", false, "Only stream frames during active gameplay (game_status=playing)")
+	cmd.Flags().BoolVar(&excludePaused, "exclude-paused", false, "Exclude paused frames (only effective with --active-only)")
+	cmd.Flags().IntVar(&idleFPS, "idle-fps", 1, "Frame rate for non-gametime frames (lobby, paused, etc.)")
+
 	return cmd
 }
 
-func runAgent(cmd *cobra.Command, args []string, frequency int, format, outputDir string, events, eventsStream bool, eventsURL, eventsUserID, eventsNodeID string) error {
+func runAgent(cmd *cobra.Command, args []string, streamCfg StreamConfig) error {
 	// Override config with command flags
-	cfg.Agent.Frequency = frequency
-	cfg.Agent.Format = format
-	cfg.Agent.OutputDirectory = outputDir
-	cfg.Agent.EventsEnabled = events
-	cfg.Agent.EventsURL = eventsURL
+	cfg.Agent.Frequency = streamCfg.Frequency
+	cfg.Agent.Format = streamCfg.Format
+	cfg.Agent.OutputDirectory = streamCfg.OutputDir
+	cfg.Agent.EventsEnabled = streamCfg.Events
+	cfg.Agent.EventsURL = streamCfg.EventsURL
 
 	// If only streaming to events API, we don't need file output
-	if eventsStream || events {
+	if streamCfg.EventsStream || streamCfg.Events {
 		// Check if any file format is specified
 		hasFileFormat := false
-		for _, f := range strings.Split(format, ",") {
+		for _, f := range strings.Split(streamCfg.Format, ",") {
 			f = strings.TrimSpace(f)
 			if f != "" && f != "none" {
 				hasFileFormat = true
@@ -109,6 +171,14 @@ func runAgent(cmd *cobra.Command, args []string, frequency int, format, outputDi
 		zap.Int("frequency", cfg.Agent.Frequency),
 		zap.String("format", cfg.Agent.Format),
 		zap.String("output_directory", cfg.Agent.OutputDirectory),
+		zap.Bool("all_frames", streamCfg.AllFrames),
+		zap.Int("fps", streamCfg.FPS),
+		zap.Strings("include_modes", streamCfg.IncludeModes),
+		zap.Strings("exclude_modes", streamCfg.ExcludeModes),
+		zap.Bool("exclude_bones", streamCfg.ExcludeBones),
+		zap.Bool("active_only", streamCfg.ActiveOnly),
+		zap.Bool("exclude_paused", streamCfg.ExcludePaused),
+		zap.Int("idle_fps", streamCfg.IdleFPS),
 		zap.Any("targets", targets))
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -118,7 +188,7 @@ func runAgent(cmd *cobra.Command, args []string, frequency int, format, outputDi
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
-	go startAgent(ctx, logger, targets, eventsStream, eventsURL, eventsUserID, eventsNodeID)
+	go startAgent(ctx, logger, targets, streamCfg)
 
 	select {
 	case <-ctx.Done():
@@ -133,7 +203,7 @@ func runAgent(cmd *cobra.Command, args []string, frequency int, format, outputDi
 	return nil
 }
 
-func startAgent(ctx context.Context, logger *zap.Logger, targets map[string][]int, eventsStreamEnabled bool, eventsURL, eventsUserID, eventsNodeID string) {
+func startAgent(ctx context.Context, logger *zap.Logger, targets map[string][]int, streamCfg StreamConfig) {
 	client := &http.Client{
 		Timeout: 3 * time.Second,
 		Transport: &http.Transport{
@@ -238,19 +308,19 @@ OuterLoop:
 
 				// If events sending is enabled, add EventsAPI writer
 				if cfg.Agent.EventsEnabled {
-					eventsWriter := agent.NewEventsAPIWriter(logger, eventsURL, cfg.Agent.JWTToken)
+					eventsWriter := agent.NewEventsAPIWriter(logger, streamCfg.EventsURL, cfg.Agent.JWTToken)
 					writers = append(writers, eventsWriter)
 				}
 				// If events streaming is enabled, add WebSocket writer
-				if eventsStreamEnabled {
+				if streamCfg.EventsStream {
 					// Derive WebSocket URL from Events URL if not explicitly set
-					wsURL := eventsURL
+					wsURL := streamCfg.EventsURL
 					if strings.HasPrefix(wsURL, "http") {
 						wsURL = strings.Replace(wsURL, "http", "ws", 1)
 					}
 					wsURL = strings.TrimSuffix(wsURL, "/") + "/v3/stream"
 
-					wsWriter := agent.NewWebSocketWriter(logger, wsURL, cfg.Agent.JWTToken, eventsNodeID, eventsUserID)
+					wsWriter := agent.NewWebSocketWriter(logger, wsURL, cfg.Agent.JWTToken, streamCfg.EventsNodeID, streamCfg.EventsUserID)
 					if err := wsWriter.Connect(); err != nil {
 						logger.Error("Failed to connect WebSocket writer", zap.Error(err))
 					} else {
@@ -272,7 +342,17 @@ OuterLoop:
 				}
 
 				sessions[baseURL] = session
-				go agent.NewHTTPFramePoller(session.Context(), logger, client, baseURL, interval, session)
+				pollerCfg := agent.PollerConfig{
+					AllFrames:     streamCfg.AllFrames,
+					FPS:           streamCfg.FPS,
+					IncludeModes:  streamCfg.IncludeModes,
+					ExcludeModes:  streamCfg.ExcludeModes,
+					ExcludeBones:  streamCfg.ExcludeBones,
+					ActiveOnly:    streamCfg.ActiveOnly,
+					ExcludePaused: streamCfg.ExcludePaused,
+					IdleFPS:       streamCfg.IdleFPS,
+				}
+				go agent.NewHTTPFramePoller(session.Context(), logger, client, baseURL, interval, session, pollerCfg)
 
 				logger.Info("Added new frame client",
 					zap.String("file_path", outputPath))
