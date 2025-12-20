@@ -1,14 +1,14 @@
 # Migration Guide: Individual Commands to Consolidated CLI
 
-This guide helps you migrate from the old individual command binaries to the new consolidated `evrtelemetry` CLI.
+This guide helps you migrate from the old individual command binaries to the new consolidated `agent` CLI.
 
 ## What Changed?
 
 Previously, you had separate binaries for each function:
-- `agent` → `evrtelemetry stream`
-- `apiserver` → `evrtelemetry serve`
-- `converter` → `evrtelemetry convert`
-- `replayer` → `evrtelemetry replay`
+- `agent` → `agent stream`
+- `apiserver` → `agent serve`
+- `converter` → `agent convert`
+- `replayer` → `agent replay`
 
 ## Quick Migration
 
@@ -21,7 +21,7 @@ Previously, you had separate binaries for each function:
 
 **New:**
 ```bash
-./evrtelemetry stream --debug --frequency 30 --log-file agent.log --output ./output 127.0.0.1:6721-6730
+./agent stream --debug --frequency 30 --log-file agent.log --output ./output 127.0.0.1:6721-6730
 ```
 
 ### API Server Command
@@ -33,14 +33,14 @@ Previously, you had separate binaries for each function:
 
 **New:**
 ```bash
-./evrtelemetry serve
+./agent serve
 ```
 
 With environment variables:
 ```bash
 export EVR_APISERVER_MONGO_URI=mongodb://localhost:27017
 export EVR_APISERVER_SERVER_ADDRESS=:8081
-./evrtelemetry serve
+./agent serve
 ```
 
 ### Converter Command
@@ -52,7 +52,7 @@ export EVR_APISERVER_SERVER_ADDRESS=:8081
 
 **New:**
 ```bash
-./evrtelemetry convert --input game.echoreplay --output game.nevrcap
+./agent convert --input game.echoreplay --output game.nevrcap
 ```
 
 ### Replayer Command
@@ -64,14 +64,14 @@ export EVR_APISERVER_SERVER_ADDRESS=:8081
 
 **New:**
 ```bash
-./evrtelemetry replay --loop --bind 127.0.0.1:6721 game.echoreplay
+./agent replay --loop --bind 127.0.0.1:6721 game.echoreplay
 ```
 
 ## New Features
 
 ### 1. Configuration Files
 
-Create a `evrtelemetry.yaml` file:
+Create a `agent.yaml` file:
 
 ```yaml
 debug: true
@@ -88,7 +88,7 @@ apiserver:
 
 Then simply run:
 ```bash
-./evrtelemetry stream -c evrtelemetry.yaml 127.0.0.1:6721-6730
+./agent stream -c agent.yaml 127.0.0.1:6721-6730
 ```
 
 ### 2. Environment Variables
@@ -98,7 +98,7 @@ All configuration can be set via environment variables with `EVR_` prefix:
 ```bash
 export EVR_AGENT_FREQUENCY=30
 export EVR_AGENT_OUTPUT_DIRECTORY=./recordings
-./evrtelemetry stream 127.0.0.1:6721-6730
+./agent stream 127.0.0.1:6721-6730
 ```
 
 ### 3. .env File Support
@@ -152,30 +152,30 @@ CMD ["/app/agent", "-frequency", "30", "127.0.0.1:6721-6730"]
 
 **New:**
 ```dockerfile
-COPY evrtelemetry /app/evrtelemetry
-COPY evrtelemetry.yaml /app/
-CMD ["/app/evrtelemetry", "stream", "-c", "/app/evrtelemetry.yaml", "127.0.0.1:6721-6730"]
+COPY agent /app/agent
+COPY agent.yaml /app/
+CMD ["/app/agent", "stream", "-c", "/app/agent.yaml", "127.0.0.1:6721-6730"]
 ```
 
 Or using environment variables:
 ```dockerfile
-COPY evrtelemetry /app/evrtelemetry
+COPY agent /app/agent
 ENV EVR_AGENT_FREQUENCY=30
 ENV EVR_AGENT_OUTPUT_DIRECTORY=/data
-CMD ["/app/evrtelemetry", "stream", "127.0.0.1:6721-6730"]
+CMD ["/app/agent", "stream", "127.0.0.1:6721-6730"]
 ```
 
 ## Getting Help
 
 View all available commands:
 ```bash
-./evrtelemetry --help
+./agent --help
 ```
 
 Get help for a specific command:
 ```bash
-./evrtelemetry stream --help
-./evrtelemetry convert --help
+./agent stream --help
+./agent convert --help
 ```
 
 ## Troubleshooting
@@ -188,7 +188,7 @@ Make sure you're using the new binary name:
 ./agent --help
 
 # Correct
-./evrtelemetry stream --help
+./agent stream --help
 ```
 
 ### Configuration not loading
@@ -196,7 +196,7 @@ Make sure you're using the new binary name:
 Check the order of precedence. Command-line flags override everything:
 ```bash
 # Config file says frequency=10, but this overrides it to 30
-./evrtelemetry stream -c config.yaml --frequency 30 127.0.0.1:6721
+./agent stream -c config.yaml --frequency 30 127.0.0.1:6721
 ```
 
 ### Environment variables not working
@@ -213,5 +213,5 @@ export EVR_AGENT_FREQUENCY=30
 ## Need More Help?
 
 - Check the [README.md](README.md) for comprehensive documentation
-- See [evrtelemetry.yaml.example](evrtelemetry.yaml.example) for config file examples
+- See [agent.yaml.example](agent.yaml.example) for config file examples
 - See [.env.example](.env.example) for environment variable examples

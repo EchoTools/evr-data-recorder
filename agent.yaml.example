@@ -1,5 +1,5 @@
 # EVR Telemetry Configuration File
-# This file can be used to configure the evrtelemetry application
+# This file can be used to configure the agent application
 # Command-line flags will override values in this file
 # Environment variables with the EVR_ prefix will also override config values
 

@@ -80,13 +80,13 @@ Convert between replay file formats:
 
 ```bash
 # Auto-detect conversion (echoreplay → nevrcap or vice versa)
-evrtelemetry convert --input game.echoreplay
+agent convert --input game.echoreplay
 
 # Specify output file
-evrtelemetry convert --input game.nevrcap --output converted.echoreplay
+agent convert --input game.nevrcap --output converted.echoreplay
 
 # Force specific format
-evrtelemetry convert --input game.echoreplay --format nevrcap
+agent convert --input game.echoreplay --format nevrcap
 ```
 
 ### Replayer - Replay Sessions
@@ -95,16 +95,16 @@ Replay recorded sessions via HTTP server:
 
 ```bash
 # Replay a single file
-evrtelemetry replay game.echoreplay
+agent replay game.echoreplay
 
 # Replay multiple files in sequence
-evrtelemetry replay game1.echoreplay game2.echoreplay
+agent replay game1.echoreplay game2.echoreplay
 
 # Loop playback continuously
-evrtelemetry replay --loop game.echoreplay
+agent replay --loop game.echoreplay
 
 # Custom bind address
-evrtelemetry replay --bind 0.0.0.0:8080 game.echoreplay
+agent replay --bind 0.0.0.0:8080 game.echoreplay
 ```
 
 ## Configuration
@@ -118,7 +118,7 @@ The application supports multiple configuration methods (in order of precedence)
 
 ### Configuration File
 
-Create a `evrtelemetry.yaml` file in your working directory or specify with `--config`:
+Create a `agent.yaml` file in your working directory or specify with `--config`:
 
 ```yaml
 # Global configuration
@@ -137,7 +137,7 @@ apiserver:
   mongo_uri: mongodb://localhost:27017
 ```
 
-See [evrtelemetry.yaml.example](evrtelemetry.yaml.example) for a complete example.
+See [agent.yaml.example](agent.yaml.example) for a complete example.
 
 ### Environment Variables
 
@@ -153,7 +153,7 @@ export EVR_AGENT_STREAM_USERNAME=myuser
 export EVR_AGENT_STREAM_PASSWORD=mypassword
 
 # Run the agent
-evrtelemetry stream 127.0.0.1:6721-6730
+agent stream 127.0.0.1:6721-6730
 ```
 
 You can also use a `.env` file. See [.env.example](.env.example) for all available variables.

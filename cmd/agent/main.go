@@ -68,11 +68,38 @@ serving recorded data.`,
 	viper.BindPFlag("log-level", rootCmd.PersistentFlags().Lookup("log-level"))
 	viper.BindPFlag("log-file", rootCmd.PersistentFlags().Lookup("log-file"))
 
+	// Define command groups
+	mainGroup := &cobra.Group{
+		ID:    "main",
+		Title: "Main Commands",
+	}
+	rootCmd.AddGroup(mainGroup)
+
 	// Add subcommands
-	rootCmd.AddCommand(newAgentCommand())
-	rootCmd.AddCommand(newAPIServerCommand())
-	rootCmd.AddCommand(newConverterCommand())
-	rootCmd.AddCommand(newReplayerCommand())
+	streamCmd := newAgentCommand()
+	streamCmd.GroupID = "main"
+	rootCmd.AddCommand(streamCmd)
+
+	serveCmd := newAPIServerCommand()
+	serveCmd.GroupID = "main"
+	rootCmd.AddCommand(serveCmd)
+
+	convertCmd := newConverterCommand()
+	convertCmd.GroupID = "main"
+	rootCmd.AddCommand(convertCmd)
+
+	replayCmd := newReplayerCommand()
+	replayCmd.GroupID = "main"
+	rootCmd.AddCommand(replayCmd)
+
+	showCmd := newDumpEventsCommand()
+	showCmd.GroupID = "main"
+	rootCmd.AddCommand(showCmd)
+
+	pushCmd := newSendEventsCommand()
+	pushCmd.GroupID = "main"
+	rootCmd.AddCommand(pushCmd)
+
 	rootCmd.AddCommand(newVersionCheckCommand())
 
 	if err := rootCmd.Execute(); err != nil {
