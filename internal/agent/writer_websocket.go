@@ -21,8 +21,6 @@ type WebSocketWriter struct {
 	logger     *zap.Logger
 	socketURL  string
 	jwtToken   string
-	nodeID     string
-	userID     string
 	ctx        context.Context
 	cancel     context.CancelFunc
 	conn       *websocket.Conn
@@ -33,15 +31,13 @@ type WebSocketWriter struct {
 }
 
 // NewWebSocketWriter creates a new WebSocketWriter.
-func NewWebSocketWriter(logger *zap.Logger, socketURL, jwtToken, nodeID, userID string) *WebSocketWriter {
+func NewWebSocketWriter(logger *zap.Logger, socketURL, jwtToken string) *WebSocketWriter {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	w := &WebSocketWriter{
 		logger:     logger.With(zap.String("component", "websocket_writer")),
 		socketURL:  socketURL,
 		jwtToken:   jwtToken,
-		nodeID:     nodeID,
-		userID:     userID,
 		ctx:        ctx,
 		cancel:     cancel,
 		outgoingCh: make(chan *telemetry.LobbySessionStateFrame, 1000),
@@ -75,12 +71,6 @@ func (w *WebSocketWriter) Connect() error {
 	header := http.Header{}
 	if w.jwtToken != "" {
 		header.Set("Authorization", "Bearer "+w.jwtToken)
-	}
-	if w.nodeID != "" {
-		header.Set("X-Node-ID", w.nodeID)
-	}
-	if w.userID != "" {
-		header.Set("X-User-ID", w.userID)
 	}
 
 	w.logger.Info("Connecting to WebSocket", zap.String("url", u.String()))

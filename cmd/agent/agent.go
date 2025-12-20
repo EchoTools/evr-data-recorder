@@ -26,8 +26,6 @@ type StreamConfig struct {
 	Events        bool
 	EventsStream  bool
 	EventsURL     string
-	EventsUserID  string
-	EventsNodeID  string
 	AllFrames     bool     // Send all frames, not just event frames
 	FPS           int      // Target frames per second for streaming
 	IncludeModes  []string // Only stream these game modes
@@ -46,8 +44,6 @@ func newAgentCommand() *cobra.Command {
 		events        bool
 		eventsStream  bool
 		eventsURL     string
-		eventsUserID  string
-		eventsNodeID  string
 		allFrames     bool
 		fps           int
 		includeModes  []string
@@ -88,8 +84,6 @@ Targets are specified as host:port or host:startPort-endPort for port ranges.`,
 				Events:        events,
 				EventsStream:  eventsStream,
 				EventsURL:     eventsURL,
-				EventsUserID:  eventsUserID,
-				EventsNodeID:  eventsNodeID,
 				AllFrames:     allFrames,
 				FPS:           fps,
 				IncludeModes:  includeModes,
@@ -112,8 +106,6 @@ Targets are specified as host:port or host:startPort-endPort for port ranges.`,
 	cmd.Flags().BoolVar(&events, "events", false, "Enable sending frames to events API")
 	cmd.Flags().BoolVar(&eventsStream, "events-stream", false, "Enable streaming frames to events API via WebSocket")
 	cmd.Flags().StringVar(&eventsURL, "events-url", "http://localhost:8081", "Base URL of the events API")
-	cmd.Flags().StringVar(&eventsUserID, "events-user-id", "", "Optional user ID header for events API")
-	cmd.Flags().StringVar(&eventsNodeID, "events-node-id", "default-node", "Node ID header for events API")
 
 	// Stream filtering options
 	cmd.Flags().BoolVar(&allFrames, "all-frames", false, "Send all frames, not just frames with events")
@@ -320,7 +312,7 @@ OuterLoop:
 					}
 					wsURL = strings.TrimSuffix(wsURL, "/") + "/v3/stream"
 
-					wsWriter := agent.NewWebSocketWriter(logger, wsURL, cfg.Agent.JWTToken, streamCfg.EventsNodeID, streamCfg.EventsUserID)
+					wsWriter := agent.NewWebSocketWriter(logger, wsURL, cfg.Agent.JWTToken)
 					if err := wsWriter.Connect(); err != nil {
 						logger.Error("Failed to connect WebSocket writer", zap.Error(err))
 					} else {

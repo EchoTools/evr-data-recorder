@@ -37,9 +37,9 @@ func (z *zapLoggerAdapter) Warn(msg string, fields ...any) {
 func newAPIServerCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "serve",
-		Short: "Run the session events API server",
+		Short: "Run the telemetry API server",
 		Long: `The serve command starts an HTTP server that provides endpoints 
-for storing and retrieving session event data, with optional capture storage
+for storing and retrieving telemetry data, with optional capture storage
 and real-time streaming support.`,
 		Example: `  # Start API server on default port
 	agent serve

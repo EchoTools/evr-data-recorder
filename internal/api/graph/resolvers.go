@@ -121,7 +121,7 @@ func (r *Resolver) SessionEvents(ctx context.Context, lobbySessionID string, lim
 			frameJSON, err := protojson.Marshal(frame.Frame)
 			if err == nil {
 				// Use standard json package to unmarshal to map
-				json.Unmarshal(frameJSON, &frameData)
+				_ = json.Unmarshal(frameJSON, &frameData)
 			}
 		}
 

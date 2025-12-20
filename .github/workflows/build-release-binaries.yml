@@ -31,7 +31,7 @@ jobs:
       - name: Get version
         id: version
         run: |
-          VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo v0.0.0)
+          VERSION=$(git describe --tags --match 'v[0-9]*' --long --always --dirty --abbrev=7 2>/dev/null || echo v0.0.0-0-g0000000)
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
 
